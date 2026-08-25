@@ -43,6 +43,14 @@ pub struct RoadReference {
     pub cross_road_name: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DutyPoint { pub id: String, pub plan_id: String, pub point_code: String, pub point_name: String, pub note: Option<String>, pub latitude: f64, pub longitude: f64, pub visible: bool }
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDutyPointInput { pub plan_id: String, pub point_code: String, pub point_name: String, pub note: Option<String>, pub latitude: f64, pub longitude: f64 }
+
 pub fn initialize_state(app_data_dir: PathBuf, road_reference_path: PathBuf) -> Result<AppState, String> {
     fs::create_dir_all(&app_data_dir).map_err(|error| format!("無法建立應用程式資料目錄：{error}"))?;
     let database_path = app_data_dir.join("dutygrid.db");
@@ -65,7 +73,24 @@ pub fn migrate(path: &Path) -> Result<(), String> {
         "INSERT OR IGNORE INTO schema_migrations(version) VALUES (?1)",
         [1],
     ).map_err(|error| format!("無法記錄資料庫 migration：{error}"))?;
+    connection.execute_batch(include_str!("../migrations/0002_duty_points.sql")).map_err(|error| format!("無法套用勤務點位 migration：{error}"))?;
+    connection.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (?1)", [2]).map_err(|error| format!("無法記錄勤務點位 migration：{error}"))?;
     Ok(())
+}
+
+pub fn list_duty_points(path: &Path, plan_id: &str) -> Result<Vec<DutyPoint>, String> {
+    let connection = open_database(path)?;
+    let mut statement = connection.prepare("SELECT id, plan_id, point_code, point_name, note, latitude, longitude, visible FROM duty_points WHERE plan_id = ?1 ORDER BY point_code").map_err(|e| format!("無法讀取勤務點位：{e}"))?;
+    let points = statement.query_map([plan_id], |r| Ok(DutyPoint { id:r.get(0)?, plan_id:r.get(1)?, point_code:r.get(2)?, point_name:r.get(3)?, note:r.get(4)?, latitude:r.get(5)?, longitude:r.get(6)?, visible:r.get::<_, i64>(7)? != 0 })).map_err(|e| format!("無法查詢勤務點位：{e}"))?.collect::<Result<Vec<_>,_>>().map_err(|e| format!("無法讀取勤務點位資料：{e}"))?;
+    Ok(points)
+}
+
+pub fn create_duty_point(path: &Path, input: CreateDutyPointInput) -> Result<DutyPoint, String> {
+    if input.point_code.trim().is_empty() || input.point_name.trim().is_empty() { return Err("點位編號與名稱不可空白。".to_owned()); }
+    let connection = open_database(path)?;
+    let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|e| format!("無法建立點位識別碼：{e}"))?;
+    connection.execute("INSERT INTO duty_points(id, plan_id, point_code, point_name, note, latitude, longitude) VALUES (?1,?2,?3,?4,?5,?6,?7)", params![id,input.plan_id,input.point_code.trim(),input.point_name.trim(),input.note,input.latitude,input.longitude]).map_err(|e| format!("無法保存勤務點位：{e}"))?;
+    connection.query_row("SELECT id, plan_id, point_code, point_name, note, latitude, longitude, visible FROM duty_points WHERE id=?1", [id], |r| Ok(DutyPoint { id:r.get(0)?, plan_id:r.get(1)?, point_code:r.get(2)?, point_name:r.get(3)?, note:r.get(4)?, latitude:r.get(5)?, longitude:r.get(6)?, visible:r.get::<_, i64>(7)? != 0 })).map_err(|e| format!("勤務點位已保存，但無法讀回資料：{e}"))
 }
 
 pub fn list_duty_plans(path: &Path) -> Result<Vec<DutyPlan>, String> {

@@ -2,7 +2,7 @@ mod database;
 
 use std::path::PathBuf;
 
-use database::{AppState, CreateDutyPlanInput, DutyPlan, RoadReference};
+use database::{AppState, CreateDutyPlanInput, CreateDutyPointInput, DutyPlan, DutyPoint, RoadReference};
 use tauri::{Manager, State};
 
 #[tauri::command]
@@ -24,6 +24,10 @@ fn create_duty_plan(state: State<'_, AppState>, input: CreateDutyPlanInput) -> R
 fn lookup_banqiao_intersection(state: State<'_, AppState>, road_name: String, cross_road_name: String) -> Result<Vec<RoadReference>, String> {
     database::lookup_intersection(&state.road_reference_path, &road_name, &cross_road_name)
 }
+#[tauri::command]
+fn list_duty_points(state: State<'_, AppState>, plan_id: String) -> Result<Vec<DutyPoint>, String> { database::list_duty_points(&state.database_path, &plan_id) }
+#[tauri::command]
+fn create_duty_point(state: State<'_, AppState>, input: CreateDutyPointInput) -> Result<DutyPoint, String> { database::create_duty_point(&state.database_path, input) }
 
 fn development_reference_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/reference/banqiao_roads.db")
@@ -39,7 +43,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir, road_reference_path).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }
