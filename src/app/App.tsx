@@ -15,10 +15,7 @@ export default function App() {
         {navigation.map((item, index) => <button className={index === 0 ? "nav-item active" : "nav-item"} key={item} type="button">{item}</button>)}
       </aside>
       <section className="workspace" aria-label="地圖工作區">
-        <div className="map-placeholder">
-          <span>板橋勤務地圖</span>
-          <p>地圖與路口參考資料將在下一階段載入。</p>
-        </div>
+        <MapCanvas />
       </section>
       <aside className="inspector" aria-label="詳細資料面板">
         <h1>開始建立勤務計畫</h1>
@@ -29,3 +26,4 @@ export default function App() {
     </main>
   );
 }
+import { MapCanvas } from "../features/map/MapCanvas";

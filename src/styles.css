@@ -10,7 +10,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .sidebar { background: #17202b; border-right: 1px solid #314154; display: flex; flex-direction: column; padding: 12px 8px; }
 .nav-item { background: transparent; border-radius: 5px; color: #b4c0d0; text-align: left; }
 .nav-item:hover, .nav-item.active { background: #263d58; color: #fff; }
-.workspace { background: #1f2b36; min-width: 0; padding: 18px; }
+.workspace { background: #1f2b36; min-width: 0; padding: 0; }
+.map-canvas { height: 100%; width: 100%; }
 .map-placeholder { align-items: center; background-image: linear-gradient(#2c3b4a 1px, transparent 1px), linear-gradient(90deg, #2c3b4a 1px, transparent 1px); background-size: 32px 32px; border: 1px solid #43556a; color: #dae5f2; display: flex; flex-direction: column; height: 100%; justify-content: center; }
 .map-placeholder span { font-size: 22px; font-weight: 700; }
 .map-placeholder p { color: #aebfd0; }
