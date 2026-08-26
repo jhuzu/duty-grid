@@ -1,0 +1,1 @@
+ALTER TABLE duty_points ADD COLUMN color TEXT NOT NULL DEFAULT 'blue';
