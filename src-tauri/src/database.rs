@@ -54,7 +54,7 @@ pub struct DutyPoint { pub id: String, pub plan_id: String, pub point_code: Stri
 pub struct CreateDutyPointInput { pub plan_id: String, pub point_code: String, pub point_name: String, pub note: Option<String>, pub color: String, pub latitude: f64, pub longitude: f64 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DutyRoute { pub id: String, pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String>, pub route_type: String, pub geometry: Option<Vec<[f64; 2]>> }
+pub struct DutyRoute { pub id: String, pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String>, pub route_type: String, pub geometry: Option<Vec<[f64; 2]>>, pub line_style: String }
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDutyRouteInput { pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String> }
@@ -82,6 +82,18 @@ pub struct ImportPersonnelInput { pub file_name: String, pub file_data: Vec<u8> 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportPersonnelResult { pub total_rows: usize, pub accepted_rows: usize, pub rejected_rows: usize }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentEquipment { pub plan_id: String, pub duty_point_id: String, pub selected_items: Vec<String> }
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveDeploymentEquipmentInput { pub plan_id: String, pub duty_point_id: String, pub selected_items: Vec<String> }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceState { pub plan_id: String, pub active_nav: String, pub selected_point_id: Option<String>, pub selected_route_id: Option<String>, pub deployment_choices: serde_json::Value, pub map_output_title: String, pub map_output_zoom: f64 }
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveWorkspaceStateInput { pub plan_id: String, pub active_nav: String, pub selected_point_id: Option<String>, pub selected_route_id: Option<String>, pub deployment_choices: serde_json::Value, pub map_output_title: String, pub map_output_zoom: f64 }
 
 pub fn initialize_state(app_data_dir: PathBuf, road_reference_path: PathBuf) -> Result<AppState, String> {
     fs::create_dir_all(&app_data_dir).map_err(|error| format!("無法建立應用程式資料目錄：{error}"))?;
@@ -154,7 +166,37 @@ pub fn migrate(path: &Path) -> Result<(), String> {
         connection.execute_batch(include_str!("../migrations/0011_personnel_phone.sql")).map_err(|e| format!("無法套用人員電話 migration：{e}"))?;
         connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [11]).map_err(|e| format!("無法記錄人員電話 migration：{e}"))?;
     }
+    let deployment_equipment_migration_done: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 12)", [], |row| row.get(0)).map_err(|e| format!("無法檢查裝備配置 migration：{e}"))?;
+    if !deployment_equipment_migration_done {
+        connection.execute_batch(include_str!("../migrations/0012_deployment_equipment.sql")).map_err(|e| format!("無法套用裝備配置 migration：{e}"))?;
+        connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [12]).map_err(|e| format!("無法記錄裝備配置 migration：{e}"))?;
+    }
+    let workspace_state_migration_done: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 13)", [], |row| row.get(0)).map_err(|e| format!("無法檢查工作區狀態 migration：{e}"))?;
+    if !workspace_state_migration_done {
+        connection.execute_batch(include_str!("../migrations/0013_workspace_state.sql")).map_err(|e| format!("無法套用工作區狀態 migration：{e}"))?;
+        connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [13]).map_err(|e| format!("無法記錄工作區狀態 migration：{e}"))?;
+    }
+    let route_line_style_migration_done: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 14)", [], |row| row.get(0)).map_err(|e| format!("無法檢查路線樣式 migration：{e}"))?;
+    if !route_line_style_migration_done {
+        connection.execute_batch(include_str!("../migrations/0014_route_line_style.sql")).map_err(|e| format!("無法套用路線樣式 migration：{e}"))?;
+        connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [14]).map_err(|e| format!("無法記錄路線樣式 migration：{e}"))?;
+    }
     seed_personnel(&connection)?;
+    Ok(())
+}
+
+pub fn load_workspace_state(path: &Path, plan_id: &str) -> Result<Option<WorkspaceState>, String> {
+    let connection = open_database(path)?;
+    connection.query_row("SELECT plan_id, active_nav, selected_point_id, selected_route_id, deployment_choices_json, map_output_title, map_output_zoom FROM workspace_states WHERE plan_id = ?1", [plan_id], |row| {
+        let choices_json: String = row.get(4)?;
+        Ok(WorkspaceState { plan_id: row.get(0)?, active_nav: row.get(1)?, selected_point_id: row.get(2)?, selected_route_id: row.get(3)?, deployment_choices: serde_json::from_str(&choices_json).unwrap_or_else(|_| serde_json::json!({})), map_output_title: row.get(5)?, map_output_zoom: row.get(6)? })
+    }).map(Some).or_else(|error| match error { rusqlite::Error::QueryReturnedNoRows => Ok(None), error => Err(format!("無法讀取勤務工作區狀態：{error}")) })
+}
+
+pub fn save_workspace_state(path: &Path, input: SaveWorkspaceStateInput) -> Result<(), String> {
+    let connection = open_database(path)?;
+    let choices = serde_json::to_string(&input.deployment_choices).map_err(|error| format!("無法保存部署表選項：{error}"))?;
+    connection.execute("INSERT INTO workspace_states(plan_id, active_nav, selected_point_id, selected_route_id, deployment_choices_json, map_output_title, map_output_zoom, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CURRENT_TIMESTAMP) ON CONFLICT(plan_id) DO UPDATE SET active_nav = excluded.active_nav, selected_point_id = excluded.selected_point_id, selected_route_id = excluded.selected_route_id, deployment_choices_json = excluded.deployment_choices_json, map_output_title = excluded.map_output_title, map_output_zoom = excluded.map_output_zoom, updated_at = CURRENT_TIMESTAMP", params![input.plan_id, input.active_nav, input.selected_point_id, input.selected_route_id, choices, input.map_output_title, input.map_output_zoom]).map_err(|error| format!("無法保存勤務工作區狀態：{error}"))?;
     Ok(())
 }
 
@@ -184,9 +226,9 @@ fn sync_seed_personnel_phones(connection: &Connection) -> Result<(), String> {
 
 pub fn list_duty_routes(path: &Path, plan_id: &str) -> Result<Vec<DutyRoute>, String> {
     let connection = open_database(path)?;
-    let mut statement = connection.prepare("SELECT id, plan_id, route_name, color, route_type, geometry_json FROM duty_routes WHERE plan_id = ?1 ORDER BY created_at").map_err(|e| format!("無法讀取勤務路線：{e}"))?;
-    let rows = statement.query_map([plan_id], |row| Ok((row.get::<_, String>(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get::<_, Option<String>>(5)?))).map_err(|e| format!("無法查詢勤務路線：{e}"))?;
-    rows.map(|row| { let (id, plan_id, route_name, color, route_type, geometry_json) = row.map_err(|e| format!("無法讀取勤務路線：{e}"))?; let mut stops = connection.prepare("SELECT point_id FROM duty_route_stops WHERE route_id = ?1 ORDER BY stop_order").map_err(|e| format!("無法讀取路線點位：{e}"))?; let point_ids = stops.query_map([&id], |r| r.get(0)).map_err(|e| format!("無法讀取路線點位：{e}"))?.collect::<Result<Vec<String>, _>>().map_err(|e| format!("無法讀取路線點位：{e}"))?; let geometry = geometry_json.map(|json| serde_json::from_str(&json).map_err(|e| format!("無法讀取手繪路線：{e}"))).transpose()?; Ok(DutyRoute { id, plan_id, route_name, color, point_ids, route_type, geometry }) }).collect()
+    let mut statement = connection.prepare("SELECT id, plan_id, route_name, color, route_type, geometry_json, line_style FROM duty_routes WHERE plan_id = ?1 ORDER BY created_at").map_err(|e| format!("無法讀取勤務路線：{e}"))?;
+    let rows = statement.query_map([plan_id], |row| Ok((row.get::<_, String>(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get::<_, Option<String>>(5)?, row.get(6)?))).map_err(|e| format!("無法查詢勤務路線：{e}"))?;
+    rows.map(|row| { let (id, plan_id, route_name, color, route_type, geometry_json, line_style) = row.map_err(|e| format!("無法讀取勤務路線：{e}"))?; let mut stops = connection.prepare("SELECT point_id FROM duty_route_stops WHERE route_id = ?1 ORDER BY stop_order").map_err(|e| format!("無法讀取路線點位：{e}"))?; let point_ids = stops.query_map([&id], |r| r.get(0)).map_err(|e| format!("無法讀取路線點位：{e}"))?.collect::<Result<Vec<String>, _>>().map_err(|e| format!("無法讀取路線點位：{e}"))?; let geometry = geometry_json.map(|json| serde_json::from_str(&json).map_err(|e| format!("無法讀取手繪路線：{e}"))).transpose()?; Ok(DutyRoute { id, plan_id, route_name, color, point_ids, route_type, geometry, line_style }) }).collect()
 }
 
 pub fn create_duty_route(path: &Path, input: CreateDutyRouteInput) -> Result<DutyRoute, String> {
@@ -195,10 +237,10 @@ pub fn create_duty_route(path: &Path, input: CreateDutyRouteInput) -> Result<Dut
     let id: String = tx.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|e| format!("無法建立路線識別碼：{e}"))?;
     tx.execute("INSERT INTO duty_routes(id, plan_id, route_name, color) VALUES (?1, ?2, ?3, ?4)", params![id, input.plan_id, input.route_name.trim(), input.color]).map_err(|e| format!("無法保存勤務路線：{e}"))?;
     for (index, point_id) in input.point_ids.iter().enumerate() { tx.execute("INSERT INTO duty_route_stops(route_id, point_id, stop_order) VALUES (?1, ?2, ?3)", params![id, point_id, index as i64]).map_err(|e| format!("無法保存路線點位：{e}"))?; }
-    tx.commit().map_err(|e| format!("無法完成勤務路線保存：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: input.point_ids, route_type: "point_sequence".to_owned(), geometry: None })
+    tx.commit().map_err(|e| format!("無法完成勤務路線保存：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: input.point_ids, route_type: "point_sequence".to_owned(), geometry: None, line_style: "solid".to_owned() })
 }
 
-pub fn create_manual_route(path: &Path, input: CreateManualRouteInput) -> Result<DutyRoute, String> { if input.route_name.trim().is_empty() || input.geometry.len() < 2 { return Err("請輸入路線名稱，並繪製至少兩個節點。".to_owned()); } let connection = open_database(path)?; let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |r| r.get(0)).map_err(|e| format!("無法建立路線識別碼：{e}"))?; let geometry_json = serde_json::to_string(&input.geometry).map_err(|e| format!("無法保存手繪路線：{e}"))?; connection.execute("INSERT INTO duty_routes(id, plan_id, route_name, color, route_type, geometry_json) VALUES (?1,?2,?3,?4,'manual',?5)", params![id,input.plan_id,input.route_name.trim(),input.color,geometry_json]).map_err(|e| format!("無法保存手繪路線：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: vec![], route_type: "manual".to_owned(), geometry: Some(input.geometry) }) }
+pub fn create_manual_route(path: &Path, input: CreateManualRouteInput) -> Result<DutyRoute, String> { if input.route_name.trim().is_empty() || input.geometry.len() < 2 { return Err("請輸入路線名稱，並繪製至少兩個節點。".to_owned()); } let connection = open_database(path)?; let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |r| r.get(0)).map_err(|e| format!("無法建立路線識別碼：{e}"))?; let geometry_json = serde_json::to_string(&input.geometry).map_err(|e| format!("無法保存手繪路線：{e}"))?; connection.execute("INSERT INTO duty_routes(id, plan_id, route_name, color, route_type, geometry_json) VALUES (?1,?2,?3,?4,'manual',?5)", params![id,input.plan_id,input.route_name.trim(),input.color,geometry_json]).map_err(|e| format!("無法保存手繪路線：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: vec![], route_type: "manual".to_owned(), geometry: Some(input.geometry), line_style: "solid".to_owned() }) }
 
 pub fn delete_duty_route(path: &Path, route_id: &str) -> Result<(), String> {
     let connection = open_database(path)?;
@@ -214,6 +256,14 @@ pub fn update_duty_route_color(path: &Path, route_id: &str, color: &str) -> Resu
     let connection = open_database(path)?;
     let updated = connection.execute("UPDATE duty_routes SET color = ?2 WHERE id = ?1", params![route_id, color]).map_err(|error| format!("無法更新路線顏色：{error}"))?;
     if updated == 0 { return Err("找不到要更新的勤務路線。".to_owned()); }
+    Ok(())
+}
+
+pub fn update_duty_route_line_style(path: &Path, route_id: &str, line_style: &str) -> Result<(), String> {
+    if !["solid", "dashed"].contains(&line_style) { return Err("僅支援實線或虛線。".to_owned()); }
+    let connection = open_database(path)?;
+    let updated = connection.execute("UPDATE duty_routes SET line_style = ?2 WHERE id = ?1", params![route_id, line_style]).map_err(|error| format!("無法更新路線樣式：{error}"))?;
+    if updated == 0 { return Err("找不到要更新的路線。".to_owned()); }
     Ok(())
 }
 
@@ -281,6 +331,28 @@ pub fn move_personnel_assignment(path: &Path, assignment_id: &str, duty_point_id
     let connection = open_database(path)?;
     if connection.execute("UPDATE personnel_assignments SET duty_point_id = ?2 WHERE id = ?1", params![assignment_id, duty_point_id]).map_err(|error| format!("無法移動人力配置：{error}"))? == 0 { return Err("找不到要移動的人力配置。".to_owned()); }
     Ok(())
+}
+
+pub fn list_deployment_equipment(path: &Path, plan_id: &str) -> Result<Vec<DeploymentEquipment>, String> {
+    let connection = open_database(path)?;
+    let mut statement = connection.prepare("SELECT plan_id, duty_point_id, selected_items_json FROM deployment_equipment WHERE plan_id = ?1 ORDER BY duty_point_id").map_err(|error| format!("無法讀取部署裝備：{error}"))?;
+    let rows = statement.query_map([plan_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))).map_err(|error| format!("無法查詢部署裝備：{error}"))?;
+    rows.map(|row| {
+        let (plan_id, duty_point_id, selected_items_json) = row.map_err(|error| format!("無法讀取部署裝備：{error}"))?;
+        let selected_items = serde_json::from_str(&selected_items_json).map_err(|error| format!("部署裝備資料格式錯誤：{error}"))?;
+        Ok(DeploymentEquipment { plan_id, duty_point_id, selected_items })
+    }).collect()
+}
+
+pub fn save_deployment_equipment(path: &Path, input: SaveDeploymentEquipmentInput) -> Result<DeploymentEquipment, String> {
+    let selected_items = input.selected_items.into_iter().map(|item| item.trim().to_owned()).filter(|item| !item.is_empty()).collect::<Vec<_>>();
+    let selected_items_json = serde_json::to_string(&selected_items).map_err(|error| format!("無法保存部署裝備：{error}"))?;
+    let connection = open_database(path)?;
+    connection.execute(
+        "INSERT INTO deployment_equipment(plan_id, duty_point_id, selected_items_json) VALUES (?1, ?2, ?3) ON CONFLICT(plan_id, duty_point_id) DO UPDATE SET selected_items_json = excluded.selected_items_json, updated_at = CURRENT_TIMESTAMP",
+        params![input.plan_id, input.duty_point_id, selected_items_json],
+    ).map_err(|error| format!("無法保存部署裝備：{error}"))?;
+    Ok(DeploymentEquipment { plan_id: input.plan_id, duty_point_id: input.duty_point_id, selected_items })
 }
 
 pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result<ImportPersonnelResult, String> {
@@ -401,6 +473,18 @@ mod tests {
         migrate(&path).expect("migration should succeed");
         create_duty_plan(&path, CreateDutyPlanInput { plan_name: "板橋勤務測試".to_owned(), duty_date: None, start_time: None, end_time: None, description: None }).expect("plan should be saved");
         assert_eq!(list_duty_plans(&path).expect("plans should load").len(), 1);
+        let _ = std::fs::remove_file(path);
+    }
+    #[test]
+    fn deployment_equipment_persists_per_point() {
+        let path = std::env::temp_dir().join(format!("dutygrid-equipment-test-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        migrate(&path).expect("migration should succeed");
+        let plan = create_duty_plan(&path, CreateDutyPlanInput { plan_name: "裝備測試".to_owned(), duty_date: None, start_time: None, end_time: None, description: None }).expect("plan should be saved");
+        let point = create_duty_point(&path, CreateDutyPointInput { plan_id: plan.id.clone(), point_code: "901".to_owned(), point_name: "測試崗哨".to_owned(), note: None, color: "red".to_owned(), latitude: 25.0, longitude: 121.0 }).expect("point should be saved");
+        save_deployment_equipment(&path, SaveDeploymentEquipmentInput { plan_id: plan.id.clone(), duty_point_id: point.id, selected_items: vec!["制服".to_owned(), "無線電(空氣導管耳機)".to_owned()] }).expect("equipment should be saved");
+        let saved = list_deployment_equipment(&path, &plan.id).expect("equipment should load");
+        assert_eq!(saved[0].selected_items, ["制服", "無線電(空氣導管耳機)"]);
         let _ = std::fs::remove_file(path);
     }
 }

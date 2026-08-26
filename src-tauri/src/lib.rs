@@ -1,26 +1,29 @@
 mod database;
 
-use std::path::PathBuf;
+use std::{fs::{self, File}, io::{Cursor, Read, Write}, path::PathBuf};
 
-use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, CreatePersonnelAssignmentInput, DutyPlan, DutyPoint, DutyRoute, ImportPersonnelInput, ImportPersonnelResult, Personnel, PersonnelAssignment, RoadReference};
-use rust_xlsxwriter::{Format, FormatAlign, FormatBorder, Workbook};
+use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, CreatePersonnelAssignmentInput, DeploymentEquipment, DutyPlan, DutyPoint, DutyRoute, ImportPersonnelInput, ImportPersonnelResult, Personnel, PersonnelAssignment, RoadReference, SaveDeploymentEquipmentInput, SaveWorkspaceStateInput, WorkspaceState};
 use serde::Deserialize;
 use tauri::{Manager, State};
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DeploymentExportRow {
     sequence: u32,
+    post_type: String,
     point_name: String,
     unit: String,
     police_count: usize,
     personnel_text: String,
     radio_text: String,
+    equipment_text: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DeploymentExportInput {
+    #[allow(dead_code)]
     plan_name: String,
     rows: Vec<DeploymentExportRow>,
 }
@@ -63,6 +66,8 @@ fn delete_duty_route(state: State<'_, AppState>, route_id: String) -> Result<(),
 #[tauri::command]
 fn update_duty_route_color(state: State<'_, AppState>, route_id: String, color: String) -> Result<(), String> { database::update_duty_route_color(&state.database_path, &route_id, &color) }
 #[tauri::command]
+fn update_duty_route_line_style(state: State<'_, AppState>, route_id: String, line_style: String) -> Result<(), String> { database::update_duty_route_line_style(&state.database_path, &route_id, &line_style) }
+#[tauri::command]
 fn update_duty_route_name(state: State<'_, AppState>, route_id: String, route_name: String) -> Result<(), String> { database::update_duty_route_name(&state.database_path, &route_id, &route_name) }
 #[tauri::command]
 fn list_common_routes(state: State<'_, AppState>) -> Result<Vec<CommonRoute>, String> { database::list_common_routes(&state.database_path) }
@@ -82,33 +87,46 @@ fn delete_personnel_assignment(state: State<'_, AppState>, assignment_id: String
 fn move_personnel_assignment(state: State<'_, AppState>, assignment_id: String, duty_point_id: String) -> Result<(), String> { database::move_personnel_assignment(&state.database_path, &assignment_id, duty_point_id) }
 #[tauri::command]
 fn import_personnel_xlsx(state: State<'_, AppState>, input: ImportPersonnelInput) -> Result<ImportPersonnelResult, String> { database::import_personnel_xlsx(&state.database_path, input) }
+#[tauri::command]
+fn list_deployment_equipment(state: State<'_, AppState>, plan_id: String) -> Result<Vec<DeploymentEquipment>, String> { database::list_deployment_equipment(&state.database_path, &plan_id) }
+#[tauri::command]
+fn save_deployment_equipment(state: State<'_, AppState>, input: SaveDeploymentEquipmentInput) -> Result<DeploymentEquipment, String> { database::save_deployment_equipment(&state.database_path, input) }
+#[tauri::command]
+fn load_workspace_state(state: State<'_, AppState>, plan_id: String) -> Result<Option<WorkspaceState>, String> { database::load_workspace_state(&state.database_path, &plan_id) }
+#[tauri::command]
+fn save_workspace_state(state: State<'_, AppState>, input: SaveWorkspaceStateInput) -> Result<(), String> { database::save_workspace_state(&state.database_path, input) }
+
+fn xml_escape(value: &str) -> String { value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;") }
+fn replace_cell_value(xml: &mut String, cell: &str, style: u8, value: &str) -> Result<(), String> {
+    let needle = format!("<c r=\"{cell}\"");
+    let start = xml.find(&needle).ok_or_else(|| format!("範本缺少儲存格 {cell}"))?;
+    let tag_end = xml[start..].find('>').ok_or_else(|| format!("範本儲存格格式錯誤：{cell}"))? + start;
+    let end = if xml[start..=tag_end].ends_with("/>") { tag_end + 1 } else { xml[tag_end..].find("</c>").ok_or_else(|| format!("範本儲存格格式錯誤：{cell}"))? + tag_end + 4 };
+    let replacement = if value.is_empty() { format!("<c r=\"{cell}\" s=\"{style}\"/>") } else { format!("<c r=\"{cell}\" s=\"{style}\" t=\"inlineStr\"><is><t xml:space=\"preserve\">{}</t></is></c>", xml_escape(value)) };
+    xml.replace_range(start..end, &replacement);
+    Ok(())
+}
+fn deployment_template_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let bundled = app.path().resolve("resources/standard_deployment_template.xlsx", tauri::path::BaseDirectory::Resource).map_err(|error| format!("無法尋找 Excel 範本：{error}"))?;
+    Ok(if bundled.is_file() { bundled } else { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../標準化部署表.xlsx") })
+}
+#[tauri::command]
+fn export_deployment_xlsx(app: tauri::AppHandle, input: DeploymentExportInput) -> Result<Vec<u8>, String> {
+    if input.rows.len() > 33 { return Err("勤務點位超過範本可填入的 33 列。".into()); }
+    let file = File::open(deployment_template_path(&app)?).map_err(|error| format!("無法讀取 Excel 範本：{error}"))?;
+    let mut source = ZipArchive::new(file).map_err(|error| format!("無法開啟 Excel 範本：{error}"))?;
+    let mut worksheet = String::new();
+    source.by_name("xl/worksheets/sheet1.xml").map_err(|error| format!("無法讀取部署表工作表：{error}"))?.read_to_string(&mut worksheet).map_err(|error| format!("無法讀取部署表資料：{error}"))?;
+    for row_number in 7..=39 { for (column, style) in [("A", 7), ("B", 8), ("C", 8), ("D", 8), ("E", 9), ("F", 8), ("G", 8), ("H", 8)] { replace_cell_value(&mut worksheet, &format!("{column}{row_number}"), style, "")?; } }
+    for (offset, row) in input.rows.iter().enumerate() { let number = offset + 7; for (column, style, value) in [("A", 7, row.sequence.to_string()), ("B", 8, row.post_type.clone()), ("C", 8, row.point_name.clone()), ("D", 8, row.unit.clone()), ("E", 9, row.police_count.to_string()), ("F", 8, row.personnel_text.clone()), ("G", 8, row.radio_text.clone()), ("H", 8, row.equipment_text.clone())] { replace_cell_value(&mut worksheet, &format!("{column}{number}"), style, &value)?; } }
+    let mut output = ZipWriter::new(Cursor::new(Vec::new()));
+    for index in 0..source.len() { let mut entry = source.by_index(index).map_err(|error| format!("無法讀取範本內容：{error}"))?; let name = entry.name().to_string(); output.start_file(&name, SimpleFileOptions::default().compression_method(CompressionMethod::Deflated)).map_err(|error| format!("無法建立匯出內容：{error}"))?; if name == "xl/worksheets/sheet1.xml" { output.write_all(worksheet.as_bytes()).map_err(|error| format!("無法寫入部署表資料：{error}"))?; } else { let mut bytes = Vec::new(); entry.read_to_end(&mut bytes).map_err(|error| format!("無法讀取範本內容：{error}"))?; output.write_all(&bytes).map_err(|error| format!("無法寫入範本內容：{error}"))?; } }
+    Ok(output.finish().map_err(|error| format!("無法完成 Excel 匯出：{error}"))?.into_inner())
+}
 
 #[tauri::command]
-fn export_deployment_xlsx(input: DeploymentExportInput) -> Result<Vec<u8>, String> {
-    let mut workbook = Workbook::new();
-    let worksheet = workbook.add_worksheet();
-    worksheet.set_name("安全維護部署表").map_err(|error| format!("無法設定工作表名稱：{error}"))?;
-    let title = Format::new().set_bold().set_font_size(18.0).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
-    let centered = Format::new().set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter).set_text_wrap().set_border(FormatBorder::Thin);
-    let header = Format::new().set_bold().set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter).set_text_wrap().set_border(FormatBorder::Thin);
-    worksheet.merge_range(0, 0, 0, 8, "安全維護部署表", &title).map_err(|error| format!("無法建立表頭：{error}"))?;
-    let plan_label = format!("勤務計畫：{}", input.plan_name);
-    worksheet.merge_range(1, 0, 1, 8, &plan_label, &centered).map_err(|error| format!("無法寫入勤務計畫：{error}"))?;
-    worksheet.merge_range(2, 0, 2, 8, "勤務日期：________________　勤務時間：________________　承辦單位：________________", &centered).map_err(|error| format!("無法建立基本資料列：{error}"))?;
-    worksheet.merge_range(3, 0, 3, 8, "本表第 7 列起依目前勤務點位與人力配置自動填入；服裝及協調欄位可於 Excel 中續填。", &centered).map_err(|error| format!("無法建立說明列：{error}"))?;
-    let headers = ["編號", "崗哨別", "崗哨位置", "派遣單位", "警力", "職稱姓名", "無線電代號", "服裝及應勤裝備", "分（協調）區協調員電話"];
-    for (column, label) in headers.iter().enumerate() { worksheet.write_string_with_format(5, column as u16, *label, &header).map_err(|error| format!("無法建立欄位：{error}"))?; }
-    let widths = [7.0, 16.0, 24.0, 16.0, 8.0, 24.0, 16.0, 22.0, 22.0];
-    for (column, width) in widths.iter().enumerate() { worksheet.set_column_width(column as u16, *width).map_err(|error| format!("無法設定欄寬：{error}"))?; }
-    worksheet.set_row_height(0, 30.0).map_err(|error| format!("無法設定標題列：{error}"))?;
-    worksheet.set_row_height(5, 72.0).map_err(|error| format!("無法設定欄位列：{error}"))?;
-    for (offset, row) in input.rows.iter().enumerate() {
-        let target = (6 + offset) as u32;
-        let values = [row.sequence.to_string(), "".to_string(), row.point_name.clone(), row.unit.clone(), row.police_count.to_string(), row.personnel_text.clone(), row.radio_text.clone(), "制服、無線電（空氣導管耳機）、服務證".to_string(), "".to_string()];
-        for (column, value) in values.iter().enumerate() { worksheet.write_string_with_format(target, column as u16, value, &centered).map_err(|error| format!("無法寫入部署資料：{error}"))?; }
-        worksheet.set_row_height(target, 72.0).map_err(|error| format!("無法設定部署資料列：{error}"))?;
-    }
-    workbook.save_to_buffer().map_err(|error| format!("無法建立 Excel：{error}"))
+fn save_exported_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    fs::write(path, bytes).map_err(|error| format!("無法儲存匯出檔案：{error}"))
 }
 
 fn development_reference_path() -> PathBuf {
@@ -118,6 +136,7 @@ fn development_reference_path() -> PathBuf {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app.path().app_local_data_dir()?;
             let bundled_path = app.path().resolve("resources/banqiao_roads.db", tauri::path::BaseDirectory::Resource)?;
@@ -125,7 +144,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir, road_reference_path).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, export_deployment_xlsx])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, export_deployment_xlsx, save_exported_file])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }

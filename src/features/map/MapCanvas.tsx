@@ -22,15 +22,19 @@ const roadLabelBasemapStyle: StyleSpecification = {
 const fallbackBasemapStyle = basemapStyle(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"]);
 
 export type MapDutyPoint = { id: string; pointCode: string; pointName: string; color: string; latitude: number; longitude: number };
-export function MapCanvas({ isDrawingRoute, manualVertexColor, manualVertices, onExportReady, onMapClick, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabels, points, routeLines, selectedPointId, showPersonnelLabels }: { isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onExportReady: (exporter: () => string | null) => void; onMapClick: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; opacity?: number }[]; selectedPointId: string | null; showPersonnelLabels: boolean }) {
+export function MapCanvas({ bearing = 0, fitToData = false, interactive = true, isDrawingRoute, manualVertexColor, manualVertices, onBearingChange, onExportReady, onMapClick, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabelPointId, personnelLabels, points, routeLines, selectedPointId, showNavigation = true, showPersonnelLabels, showPointLabels, zoomAdjustment = 0 }: { bearing?: number; fitToData?: boolean; interactive?: boolean; isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onBearingChange?: (bearing: number) => void; onExportReady: (exporter: () => string | null) => void; onMapClick: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabelPointId: string | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; opacity?: number }[]; selectedPointId: string | null; showNavigation?: boolean; showPersonnelLabels: boolean; showPointLabels: boolean; zoomAdjustment?: number }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const onMapClickRef = useRef(onMapClick);
   const onRouteVertexRef = useRef(onRouteVertex);
+  const onBearingChangeRef = useRef(onBearingChange);
   const isDrawingRouteRef = useRef(isDrawingRoute);
   const hasFallback = useRef(false);
+  const fittedZoom = useRef<number | null>(null);
+  const fitDataKey = JSON.stringify({ points: points.map((point) => [point.id, point.longitude, point.latitude]), routes: routeLines.map((route) => route.coordinates) });
 
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { onBearingChangeRef.current = onBearingChange; }, [onBearingChange]);
   useEffect(() => { onExportReady(() => {
     const activeMap = map.current;
     if (!activeMap) return null;
@@ -46,21 +50,41 @@ export function MapCanvas({ isDrawingRoute, manualVertexColor, manualVertices, o
     context.scale(scale, scale);
     routeLines.forEach((route) => { context.beginPath(); route.coordinates.forEach((coordinate, index) => { const pixel = activeMap.project(coordinate); if (index === 0) context.moveTo(pixel.x, pixel.y); else context.lineTo(pixel.x, pixel.y); }); context.strokeStyle = colors[route.color] ?? colors.blue; context.globalAlpha = route.opacity ?? 1; context.lineWidth = 5; context.lineCap = "round"; if (route.dashed) context.setLineDash([10, 8]); context.stroke(); context.setLineDash([]); });
     context.globalAlpha = 1;
-    points.forEach((point) => { const pixel = activeMap.project([point.longitude, point.latitude]); context.beginPath(); context.fillStyle = colors[point.color] ?? colors.blue; context.strokeStyle = "#243242"; context.lineWidth = 2; context.arc(pixel.x, pixel.y, 8, 0, Math.PI * 2); context.fill(); context.stroke(); context.font = "bold 14px sans-serif"; context.fillStyle = "#18222d"; context.strokeStyle = "#ffffff"; context.lineWidth = 4; context.strokeText(point.pointCode, pixel.x + 12, pixel.y - 12); context.fillText(point.pointCode, pixel.x + 12, pixel.y - 12); });
+    points.forEach((point) => { const pixel = activeMap.project([point.longitude, point.latitude]); context.beginPath(); context.fillStyle = colors[point.color] ?? colors.blue; context.strokeStyle = "#243242"; context.lineWidth = 2; context.arc(pixel.x, pixel.y, 8, 0, Math.PI * 2); context.fill(); context.stroke(); context.font = '700 14px "BiauKai", "DFKaiSho-SB", "DFKai-SB", "Kaiti TC", "STKaiti", serif'; context.fillStyle = "#18222d"; context.strokeStyle = "#ffffff"; context.lineWidth = 4; context.strokeText(point.pointCode, pixel.x + 12, pixel.y - 12); context.fillText(point.pointCode, pixel.x + 12, pixel.y - 12); });
     return canvas.toDataURL("image/png");
   }); }, [onExportReady, points, routeLines]);
   useEffect(() => { onRouteVertexRef.current = onRouteVertex; isDrawingRouteRef.current = isDrawingRoute; }, [isDrawingRoute, onRouteVertex]);
   useEffect(() => { const point = points.find((item) => item.id === selectedPointId); if (point && map.current) map.current.easeTo({ center: [point.longitude, point.latitude], duration: 350 }); }, [points, selectedPointId]);
+  useEffect(() => { map.current?.setBearing(bearing); }, [bearing]);
+  useEffect(() => {
+    if (!fitToData || !map.current || !points.length) return;
+    const coordinates = [...points.map((point) => [point.longitude, point.latitude] as [number, number]), ...routeLines.flatMap((route) => route.coordinates)];
+    const west = Math.min(...coordinates.map(([longitude]) => longitude)); const east = Math.max(...coordinates.map(([longitude]) => longitude));
+    const south = Math.min(...coordinates.map(([, latitude]) => latitude)); const north = Math.max(...coordinates.map(([, latitude]) => latitude));
+    map.current.fitBounds([[west, south], [east, north]], { bearing, duration: 0, maxZoom: 16, padding: 64 });
+    fittedZoom.current = map.current.getZoom();
+    map.current.setZoom(fittedZoom.current + zoomAdjustment);
+  }, [bearing, fitDataKey, fitToData]);
+  useEffect(() => { if (fitToData && fittedZoom.current !== null) map.current?.setZoom(fittedZoom.current + zoomAdjustment); }, [fitToData, zoomAdjustment]);
 
   useEffect(() => {
     if (!container.current || map.current) return;
     map.current = new Map({
       container: container.current,
       center: banqiaoCenter,
+      bearing,
+      interactive,
+      canvasContextAttributes: { preserveDrawingBuffer: true },
       zoom: 13,
       style: roadLabelBasemapStyle,
     });
-    map.current.addControl(new NavigationControl(), "top-left");
+    if (interactive) {
+      map.current.scrollZoom.enable();
+      map.current.dragPan.enable();
+      map.current.doubleClickZoom.enable();
+      map.current.touchZoomRotate.enable();
+    }
+    if (showNavigation) map.current.addControl(new NavigationControl(), "top-left");
     map.current.on("error", (event) => {
       if (!hasFallback.current && event.sourceId === "basemap") {
         hasFallback.current = true;
@@ -68,14 +92,15 @@ export function MapCanvas({ isDrawingRoute, manualVertexColor, manualVertices, o
       }
     });
     map.current.on("click", (event) => { if (isDrawingRouteRef.current) onRouteVertexRef.current(event.lngLat.lat, event.lngLat.lng); else onMapClickRef.current(event.lngLat.lat, event.lngLat.lng); });
+    map.current.on("rotate", () => onBearingChangeRef.current?.(map.current?.getBearing() ?? bearing));
     return () => { map.current?.remove(); map.current = null; };
   }, []);
 
   useEffect(() => {
     if (!map.current) return;
-    const markers = points.map((point) => { const element = document.createElement("button"); let suppressLabelClick = false; element.className = `duty-point-dot ${point.color} ${selectedPointId === point.id ? "selected" : ""} ${isDrawingRoute ? "drawing-disabled" : ""} ${showPersonnelLabels && personnelLabels[point.id]?.length ? "show-personnel-label" : ""}`; element.title = point.pointName; const label = document.createElement("span"); label.className = "duty-point-label"; label.textContent = point.pointCode; label.title = "拖曳可調整標籤位置（限點位周圍）"; label.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); const originX = event.clientX; const originY = event.clientY; const startX = Number.parseFloat(element.style.getPropertyValue("--label-offset-x")) || 0; const startY = Number.parseFloat(element.style.getPropertyValue("--label-offset-y")) || 0; const move = (moveEvent: PointerEvent) => { const offsetX = startX + moveEvent.clientX - originX; const offsetY = startY + originY - moveEvent.clientY; const distance = Math.hypot(offsetX, offsetY); const scale = distance > 64 ? 64 / distance : 1; if (Math.abs(moveEvent.clientX - originX) > 2 || Math.abs(moveEvent.clientY - originY) > 2) suppressLabelClick = true; element.style.setProperty("--label-offset-x", `${offsetX * scale}px`); element.style.setProperty("--label-offset-y", `${offsetY * scale}px`); }; const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.setTimeout(() => { suppressLabelClick = false; }, 0); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); }); element.append(label); const people = personnelLabels[point.id]; if (people?.length) { const personnelLabel = document.createElement("span"); personnelLabel.className = "duty-personnel-label"; personnelLabel.textContent = people.join("、"); element.append(personnelLabel); } element.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); if (suppressLabelClick) return; if (!isDrawingRoute) { onPointSelect(point.id); element.classList.toggle("show-label"); } }); const marker = new Marker({ element, draggable: !isDrawingRoute }).setLngLat([point.longitude, point.latitude]).addTo(map.current!); marker.on("dragend", () => { const position = marker.getLngLat(); onPointMoved(point, position.lat, position.lng); }); return marker; });
+    const markers = points.map((point) => { const element = document.createElement("button"); let suppressLabelClick = false; element.className = `duty-point-dot ${point.color} ${selectedPointId === point.id ? "selected" : ""} ${isDrawingRoute ? "drawing-disabled" : ""} ${showPointLabels ? "show-label" : ""} ${(showPersonnelLabels || personnelLabelPointId === point.id) && personnelLabels[point.id]?.length ? "show-personnel-label" : ""}`; element.title = point.pointName; const label = document.createElement("span"); label.className = "duty-point-label"; label.textContent = point.pointCode; label.title = "拖曳可調整標籤位置（限點位周圍）"; label.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); const originX = event.clientX; const originY = event.clientY; const startX = Number.parseFloat(element.style.getPropertyValue("--label-offset-x")) || 0; const startY = Number.parseFloat(element.style.getPropertyValue("--label-offset-y")) || 0; const move = (moveEvent: PointerEvent) => { const offsetX = startX + moveEvent.clientX - originX; const offsetY = startY + originY - moveEvent.clientY; const distance = Math.hypot(offsetX, offsetY); const scale = distance > 64 ? 64 / distance : 1; if (Math.abs(moveEvent.clientX - originX) > 2 || Math.abs(moveEvent.clientY - originY) > 2) suppressLabelClick = true; element.style.setProperty("--label-offset-x", `${offsetX * scale}px`); element.style.setProperty("--label-offset-y", `${offsetY * scale}px`); }; const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.setTimeout(() => { suppressLabelClick = false; }, 0); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); }); element.append(label); const people = personnelLabels[point.id]; if (people?.length) { const personnelLabel = document.createElement("span"); personnelLabel.className = "duty-personnel-label"; personnelLabel.textContent = people.join("、"); element.append(personnelLabel); } element.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); if (suppressLabelClick) return; if (!isDrawingRoute) { onPointSelect(point.id); element.classList.toggle("show-label"); } }); const marker = new Marker({ element, draggable: !isDrawingRoute }).setLngLat([point.longitude, point.latitude]).addTo(map.current!); marker.on("dragend", () => { const position = marker.getLngLat(); onPointMoved(point, position.lat, position.lng); }); return marker; });
     return () => markers.forEach((marker) => marker.remove());
-  }, [isDrawingRoute, onPointMoved, onPointSelect, personnelLabels, points, selectedPointId, showPersonnelLabels]);
+  }, [interactive, isDrawingRoute, onPointMoved, onPointSelect, personnelLabelPointId, personnelLabels, points, selectedPointId, showPersonnelLabels, showPointLabels]);
 
   useEffect(() => {
     if (!map.current || !pendingCoordinate) return;
