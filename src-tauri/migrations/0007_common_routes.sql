@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS common_routes (
+  id TEXT PRIMARY KEY NOT NULL,
+  route_name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'blue',
+  geometry_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

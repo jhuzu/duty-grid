@@ -2,7 +2,7 @@ mod database;
 
 use std::path::PathBuf;
 
-use database::{AppState, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, DutyPlan, DutyPoint, DutyRoute, RoadReference};
+use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, DutyPlan, DutyPoint, DutyRoute, RoadReference};
 use tauri::{Manager, State};
 
 #[tauri::command]
@@ -42,6 +42,12 @@ fn create_manual_route(state: State<'_, AppState>, input: CreateManualRouteInput
 fn delete_duty_route(state: State<'_, AppState>, route_id: String) -> Result<(), String> { database::delete_duty_route(&state.database_path, &route_id) }
 #[tauri::command]
 fn update_duty_route_color(state: State<'_, AppState>, route_id: String, color: String) -> Result<(), String> { database::update_duty_route_color(&state.database_path, &route_id, &color) }
+#[tauri::command]
+fn list_common_routes(state: State<'_, AppState>) -> Result<Vec<CommonRoute>, String> { database::list_common_routes(&state.database_path) }
+#[tauri::command]
+fn create_common_route(state: State<'_, AppState>, input: CreateCommonRouteInput) -> Result<CommonRoute, String> { database::create_common_route(&state.database_path, input) }
+#[tauri::command]
+fn delete_common_route(state: State<'_, AppState>, route_id: String) -> Result<(), String> { database::delete_common_route(&state.database_path, &route_id) }
 
 fn development_reference_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/reference/banqiao_roads.db")
@@ -57,7 +63,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir, road_reference_path).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, list_common_routes, create_common_route, delete_common_route])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }

@@ -59,6 +59,12 @@ pub struct CreateDutyRouteInput { pub plan_id: String, pub route_name: String, p
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateManualRouteInput { pub plan_id: String, pub route_name: String, pub color: String, pub geometry: Vec<[f64; 2]> }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommonRoute { pub id: String, pub route_name: String, pub color: String, pub geometry: Vec<[f64; 2]> }
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCommonRouteInput { pub route_name: String, pub color: String, pub geometry: Vec<[f64; 2]> }
 
 pub fn initialize_state(app_data_dir: PathBuf, road_reference_path: PathBuf) -> Result<AppState, String> {
     fs::create_dir_all(&app_data_dir).map_err(|error| format!("無法建立應用程式資料目錄：{error}"))?;
@@ -106,6 +112,11 @@ pub fn migrate(path: &Path) -> Result<(), String> {
         connection.execute_batch(include_str!("../migrations/0006_allow_duplicate_point_codes.sql")).map_err(|e| format!("無法允許重複點位編號：{e}"))?;
         connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [6]).map_err(|e| format!("無法記錄點位編號 migration：{e}"))?;
     }
+    let common_route_migration_done: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 7)", [], |row| row.get(0)).map_err(|e| format!("無法檢查常用路線 migration：{e}"))?;
+    if !common_route_migration_done {
+        connection.execute_batch(include_str!("../migrations/0007_common_routes.sql")).map_err(|e| format!("無法套用常用路線 migration：{e}"))?;
+        connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [7]).map_err(|e| format!("無法記錄常用路線 migration：{e}"))?;
+    }
     Ok(())
 }
 
@@ -139,8 +150,32 @@ pub fn update_duty_route_color(path: &Path, route_id: &str, color: &str) -> Resu
         return Err("不支援的路線顏色。".to_owned());
     }
     let connection = open_database(path)?;
-    let updated = connection.execute("UPDATE duty_routes SET color = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![route_id, color]).map_err(|error| format!("無法更新路線顏色：{error}"))?;
+    let updated = connection.execute("UPDATE duty_routes SET color = ?2 WHERE id = ?1", params![route_id, color]).map_err(|error| format!("無法更新路線顏色：{error}"))?;
     if updated == 0 { return Err("找不到要更新的勤務路線。".to_owned()); }
+    Ok(())
+}
+
+pub fn list_common_routes(path: &Path) -> Result<Vec<CommonRoute>, String> {
+    let connection = open_database(path)?;
+    let mut statement = connection.prepare("SELECT id, route_name, color, geometry_json FROM common_routes ORDER BY created_at DESC").map_err(|error| format!("無法讀取常用路線：{error}"))?;
+    let rows = statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?))).map_err(|error| format!("無法查詢常用路線：{error}"))?;
+    let common_routes = rows.map(|row| { let (id, route_name, color, geometry_json) = row.map_err(|error| format!("無法讀取常用路線：{error}"))?; let geometry = serde_json::from_str(&geometry_json).map_err(|error| format!("無法讀取常用路線座標：{error}"))?; Ok(CommonRoute { id, route_name, color, geometry }) }).collect();
+    common_routes
+}
+
+pub fn create_common_route(path: &Path, input: CreateCommonRouteInput) -> Result<CommonRoute, String> {
+    if input.route_name.trim().is_empty() || input.geometry.len() < 2 { return Err("請選擇至少含兩個節點的路線，再儲存為常用路線。".to_owned()); }
+    let connection = open_database(path)?;
+    let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立常用路線識別碼：{error}"))?;
+    let geometry_json = serde_json::to_string(&input.geometry).map_err(|error| format!("無法保存常用路線：{error}"))?;
+    connection.execute("INSERT INTO common_routes(id, route_name, color, geometry_json) VALUES (?1, ?2, ?3, ?4)", params![id, input.route_name.trim(), input.color, geometry_json]).map_err(|error| format!("無法保存常用路線：{error}"))?;
+    Ok(CommonRoute { id, route_name: input.route_name.trim().to_owned(), color: input.color, geometry: input.geometry })
+}
+
+pub fn delete_common_route(path: &Path, route_id: &str) -> Result<(), String> {
+    let connection = open_database(path)?;
+    let deleted = connection.execute("DELETE FROM common_routes WHERE id = ?1", [route_id]).map_err(|error| format!("無法刪除常用路線：{error}"))?;
+    if deleted == 0 { return Err("找不到要刪除的常用路線。".to_owned()); }
     Ok(())
 }
 

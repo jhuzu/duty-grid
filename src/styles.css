@@ -56,6 +56,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .route-list-row small { display: none; }
 .route-delete-button { background: transparent !important; color: #c7d2df; font-size: 22px; line-height: 1; margin: 0 !important; padding: 3px 8px !important; }
 .route-delete-button:hover { color: #f16b6b; }
+.save-common-route { margin-top: 8px !important; }
 .drawing-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .drawing-actions button { margin: 0 !important; }
 .route-name-row { display: flex; gap: 8px; }
@@ -64,6 +65,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .point-route-placeholder { border-top: 1px solid #314154; display: flex; flex-direction: column; gap: 4px; margin-top: 32px; padding-top: 22px; }
 .point-route-placeholder strong { font-size: 16px; }
 .point-route-placeholder span { color: #93a4b7; font-size: 13px; }
+.common-route-history { border-top: 1px solid #314154; display: grid; gap: 8px; margin-top: 24px; padding-top: 18px; }
+.common-route-history > strong { font-size: 16px; }
+.common-route-history > span { color: #93a4b7; font-size: 13px; }
 .route-draw-vertex { color: #2d9cdb; display: block; font: 700 16px/1 system-ui; text-align: center; text-shadow: 0 1px 2px #fff, 1px 0 2px #fff, -1px 0 2px #fff; }
 .route-draw-vertex.red { color: #df5050; }.route-draw-vertex.orange { color: #ed9a3a; }.route-draw-vertex.yellow { color: #b98100; }.route-draw-vertex.green { color: #248450; }.route-draw-vertex.blue { color: #1876b0; }.route-draw-vertex.purple { color: #6743ad; }
 .point-list-row { display: flex; gap: 6px; }
