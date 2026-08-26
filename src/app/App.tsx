@@ -9,6 +9,8 @@ const pointColors = [
 ];
 type DutyRoute = { id: string; planId: string; routeName: string; color: string; pointIds: string[]; routeType: string; geometry?: [number, number][]; lineStyle?: "solid" | "dashed" };
 type CommonRoute = { id: string; routeName: string; color: string; geometry: [number, number][] };
+type Personnel = { id: string; personnelCode: string; radioCode: string; name: string; title: string; unit: string };
+type PersonnelAssignment = { id: string; planId: string; personnelId: string; dutyPointId: string | null; assignedUnit: string; assignedTitle: string };
 
 export default function App() {
   const [planId, setPlanId] = useState<string | null>(null);
@@ -25,6 +27,11 @@ export default function App() {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [routes, setRoutes] = useState<DutyRoute[]>([]);
   const [commonRoutes, setCommonRoutes] = useState<CommonRoute[]>([]);
+  const [personnel, setPersonnel] = useState<Personnel[]>([]);
+  const [personnelAssignments, setPersonnelAssignments] = useState<PersonnelAssignment[]>([]);
+  const [personnelKeyword, setPersonnelKeyword] = useState("");
+  const [personnelUnit, setPersonnelUnit] = useState("");
+  const [personnelTitle, setPersonnelTitle] = useState("");
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [editingRouteName, setEditingRouteName] = useState("");
@@ -39,6 +46,8 @@ export default function App() {
   useEffect(() => { if (planId) void invoke<MapDutyPoint[]>("list_duty_points", { planId }).then(setPoints).catch((error) => setMessage(`無法載入勤務點位：${String(error)}`)); }, [planId]);
   useEffect(() => { if (planId) void invoke<DutyRoute[]>("list_duty_routes", { planId }).then(setRoutes).catch((error) => setMessage(`無法載入勤務路線：${String(error)}`)); setSelectedRouteId(null); }, [planId]);
   useEffect(() => { void invoke<CommonRoute[]>("list_common_routes").then(setCommonRoutes).catch((error) => setMessage(`無法載入常用路線：${String(error)}`)); }, []);
+  useEffect(() => { void invoke<Personnel[]>("list_personnel").then(setPersonnel).catch((error) => setMessage(`無法載入人員資料：${String(error)}`)); }, []);
+  useEffect(() => { if (planId) void invoke<PersonnelAssignment[]>("list_personnel_assignments", { planId }).then(setPersonnelAssignments).catch((error) => setMessage(`無法載入人力配置：${String(error)}`)); else setPersonnelAssignments([]); }, [planId]);
   useEffect(() => {
     function handleDeleteKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
@@ -69,8 +78,16 @@ export default function App() {
   async function saveSelectedRouteAsCommon() { const route = routes.find((item) => item.id === selectedRouteId); if (!route) { setValidationError("請先選擇一條已儲存路線。"); return; } const geometry = routeCoordinates(route); if (geometry.length < 2) { setValidationError("此路線缺少可用節點，無法儲存為常用路線。"); return; } try { const commonRoute = await invoke<CommonRoute>("create_common_route", { input: { routeName: route.routeName, color: route.color, geometry } }); setCommonRoutes((current) => [commonRoute, ...current]); setValidationError(""); setMessage(`已將 ${route.routeName} 儲存為常用路線。`); } catch (error) { setMessage(`無法儲存常用路線：${String(error)}`); } }
   async function applyCommonRoute(commonRoute: CommonRoute) { if (!planId) { setMessage("請先建立勤務計畫，再套用常用路線。"); return; } try { const route = await invoke<DutyRoute>("create_manual_route", { input: { planId, routeName: commonRoute.routeName, color: commonRoute.color, geometry: commonRoute.geometry } }); setRoutes((current) => [...current, { ...route, lineStyle: "solid" }]); setMessage(`已套用常用路線 ${commonRoute.routeName}。`); } catch (error) { setMessage(`無法套用常用路線：${String(error)}`); } }
   async function deleteCommonRoute(commonRoute: CommonRoute) { try { await invoke("delete_common_route", { routeId: commonRoute.id }); setCommonRoutes((current) => current.filter((item) => item.id !== commonRoute.id)); setMessage(`已刪除常用路線 ${commonRoute.routeName}。`); } catch (error) { setMessage(`無法刪除常用路線：${String(error)}`); } }
+  async function assignPersonnel(person: Personnel) { if (!planId || !selectedPointId) { setValidationError("請先在地圖選擇要配置的勤務點位。"); return; } try { const assignment = await invoke<PersonnelAssignment>("create_personnel_assignment", { input: { planId, personnelId: person.id, dutyPointId: selectedPointId, assignedUnit: person.unit, assignedTitle: person.title } }); setPersonnelAssignments((current) => [...current, assignment]); setValidationError(""); setMessage(`已將 ${person.name} 配置至勤務點位。`); } catch (error) { setMessage(`無法配置人員：${String(error)}`); } }
+  async function removePersonnelAssignment(assignment: PersonnelAssignment) { try { await invoke("delete_personnel_assignment", { assignmentId: assignment.id }); setPersonnelAssignments((current) => current.filter((item) => item.id !== assignment.id)); setMessage("已移除人力配置。"); } catch (error) { setMessage(`無法移除人力配置：${String(error)}`); } }
+  async function importPersonnelFile(file: File) { try { const fileData = Array.from(new Uint8Array(await file.arrayBuffer())); const result = await invoke<{ totalRows: number; acceptedRows: number; rejectedRows: number }>("import_personnel_xlsx", { input: { fileName: file.name, fileData } }); setPersonnel(await invoke<Personnel[]>("list_personnel")); setMessage(`人力匯入完成：${result.acceptedRows}/${result.totalRows} 筆成功，${result.rejectedRows} 筆拒絕。`); } catch (error) { setMessage(`無法人力匯入：${String(error)}`); } }
   function beginRouteRename(route: DutyRoute) { setSelectedRouteId(route.id); setRouteColor(route.color); setEditingRouteId(route.id); setEditingRouteName(route.routeName); }
   async function saveRouteRename(route: DutyRoute) { const routeName = editingRouteName.trim(); if (!routeName) { setValidationError("請輸入路線名稱。"); return; } try { await invoke("update_duty_route_name", { routeId: route.id, routeName }); setRoutes((current) => current.map((item) => item.id === route.id ? { ...item, routeName } : item)); setEditingRouteId(null); setValidationError(""); setMessage(`已更名為 ${routeName}。`); } catch (error) { setMessage(`無法更新路線名稱：${String(error)}`); } }
+  const units = [...new Set(personnel.map((person) => person.unit))].sort();
+  const titles = [...new Set(personnel.map((person) => person.title))].sort();
+  const selectedPoint = points.find((point) => point.id === selectedPointId);
+  const filteredPersonnel = personnel.filter((person) => { const keyword = personnelKeyword.trim().toLowerCase(); return (!keyword || [person.name, person.personnelCode, person.radioCode].some((value) => value.toLowerCase().includes(keyword))) && (!personnelUnit || person.unit === personnelUnit) && (!personnelTitle || person.title === personnelTitle); });
+  const pointAssignments = personnelAssignments.filter((assignment) => assignment.dutyPointId === selectedPointId);
   async function saveManualRoute() { if (!planId) return; if (!routeName.trim() || manualVertices.length < 2) { setValidationError("請輸入路線名稱，並至少繪製兩個折點。"); return; } try { const route = await invoke<DutyRoute>("create_manual_route", { input: { planId, routeName, color: routeColor, geometry: manualVertices } }); setValidationError(""); setRoutes((current) => [...current, { ...route, lineStyle: routeLineStyle }]); setManualVertices([]); setRouteName(""); setMessage(`已保存手繪路線 ${route.routeName}。`); } catch (error) { setMessage(String(error)); } }
   return (
     <main className="app-shell">
@@ -105,6 +122,8 @@ export default function App() {
           <section className="point-route-placeholder"><strong>依點位建立路線</strong><span>功能尚未實作</span></section>
           <section className="common-route-history"><strong>已儲存歷史路線</strong>{commonRoutes.length ? <div className="route-list">{commonRoutes.map((route) => <div className="route-list-row" key={route.id}><button className="route-list-select" type="button" onClick={() => void applyCommonRoute(route)}><i className={`point-color-chip ${route.color}`} />{route.routeName}</button><button className="route-delete-button" aria-label={`刪除常用路線 ${route.routeName}`} type="button" onClick={() => void deleteCommonRoute(route)}>×</button></div>)}</div> : <span>尚無常用路線。</span>}</section>
         </>}
+        {activeNav === "人力配置" && <><p>{selectedPoint ? `目前配置點位：${selectedPoint.pointCode}｜${selectedPoint.pointName}` : "請先在地圖點選勤務點位，再從下方篩選並配置人員。"}</p><div className="personnel-filters"><input aria-label="搜尋人員" placeholder="搜尋姓名、警號或無線電代號" value={personnelKeyword} onChange={(event) => setPersonnelKeyword(event.target.value)} /><select aria-label="篩選單位" value={personnelUnit} onChange={(event) => setPersonnelUnit(event.target.value)}><option value="">所有單位</option>{units.map((unit) => <option key={unit} value={unit}>{unit} 單位</option>)}</select><select aria-label="篩選職稱" value={personnelTitle} onChange={(event) => setPersonnelTitle(event.target.value)}><option value="">所有職稱</option>{titles.map((title) => <option key={title} value={title}>{title}</option>)}</select></div>{selectedPoint && <section className="assigned-personnel"><strong>已配置人員（{pointAssignments.length}）</strong>{pointAssignments.length ? pointAssignments.map((assignment) => { const person = personnel.find((item) => item.id === assignment.personnelId); return <div className="assignment-row" key={assignment.id}><span>{person?.name ?? "已刪除人員"} · {assignment.assignedTitle}</span><button type="button" onClick={() => void removePersonnelAssignment(assignment)}>移除</button></div>; }) : <span>尚未配置人員。</span>}</section>}<section className="personnel-results"><strong>可配置人員（{filteredPersonnel.length}）</strong>{filteredPersonnel.map((person) => { const assigned = personnelAssignments.some((assignment) => assignment.personnelId === person.id); return <div className="personnel-row" key={person.id}><span><b>{person.name}</b><small>{person.personnelCode} · {person.radioCode} · {person.unit} 單位 · {person.title}</small></span><button disabled={!selectedPoint || assigned} type="button" onClick={() => void assignPersonnel(person)}>{assigned ? "已配置" : "配置"}</button></div>; })}</section></>}
+        {activeNav === "人員資料" && <><p>可匯入 Excel 人力清冊；匯入失敗列會保留原始資料與錯誤原因。</p><section className="personnel-import"><strong>匯入人力資料</strong><span>接受 .xlsx。必填欄位：personnel_code、radio_code、name、title、unit。</span><input accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importPersonnelFile(file); event.currentTarget.value = ""; }} /></section><span className="section-caption">目前人員：{personnel.length} 位</span></>}
       </aside>
       <footer className="status-bar">資料庫：尚未初始化　｜　路口參考：已隨 App 提供</footer>
       {pendingDelete && <div className="confirm-backdrop" role="dialog" aria-modal="true"><section className="confirm-dialog"><h2>刪除勤務點位？</h2><p>將永久刪除「{pendingDelete.pointCode}｜{pendingDelete.pointName}」。</p><div><button type="button" onClick={() => setPendingDelete(null)}>取消</button><button className="delete-button" type="button" onClick={() => void deletePoint()}>確認刪除</button></div></section></div>}

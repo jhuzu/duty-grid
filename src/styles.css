@@ -39,6 +39,15 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .inspector button { background: #1769aa; margin-top: 10px; }
 .field-label { color: #b4c0d0; display: block; font-size: 13px; margin: 18px 0 6px; }
 .inspector input { background: #0d141c; border: 1px solid #43556a; border-radius: 6px; color: #fff; font: inherit; padding: 9px; width: 100%; }
+.personnel-filters { display: grid; gap: 8px; margin: 16px 0; }
+.personnel-filters select { background: #0d141c; border: 1px solid #43556a; border-radius: 6px; color: #fff; font: inherit; padding: 9px; width: 100%; }
+.assigned-personnel, .personnel-results, .personnel-import { display: grid; gap: 7px; margin-top: 18px; }
+.assigned-personnel > span, .personnel-import span { color: #93a4b7; font-size: 13px; }
+.assignment-row, .personnel-row { align-items: center; border: 1px solid #314154; border-radius: 6px; display: flex; gap: 8px; justify-content: space-between; padding: 7px 9px; }
+.assignment-row button, .personnel-row button { margin: 0; padding: 6px 8px; }
+.personnel-row > span { display: grid; gap: 2px; min-width: 0; }
+.personnel-row small { color: #93a4b7; font-size: 12px; }
+.personnel-import input { background: transparent; border: 0; padding: 3px 0; }
 .point-list { display: grid; gap: 8px; margin: 18px 0; }
 .point-list-item { background: transparent !important; border: 1px solid #314154; padding: 7px 9px; text-align: left; }
 .point-list-item.selected { background: #263d58 !important; border-color: #4f91c9; }
