@@ -27,7 +27,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .duty-point-dot.selected { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1769aa; }
 .duty-point-dot.drawing-disabled { cursor: default; opacity: .45; pointer-events: none; }
 .duty-point-dot.blue, .color-option.blue, .point-color-chip.blue { background: #2d9cdb; }.duty-point-dot.red, .color-option.red, .point-color-chip.red { background: #df5050; }.duty-point-dot.orange, .color-option.orange, .point-color-chip.orange { background: #ed9a3a; }.duty-point-dot.yellow, .color-option.yellow, .point-color-chip.yellow { background: #f6c453; }.duty-point-dot.green, .color-option.green, .point-color-chip.green { background: #3faf71; }.duty-point-dot.purple, .color-option.purple, .point-color-chip.purple { background: #8966d1; }
-.duty-point-label { background: #fff; border: 1px solid #516170; border-radius: 4px; bottom: 22px; color: #18222d; display: none; font: 700 14px/1.2 "Microsoft JhengHei", sans-serif; left: 50%; padding: 6px 8px; position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.duty-point-label { background: #fff; border: 1px solid #516170; border-radius: 4px; bottom: calc(22px + var(--label-offset-y, 0px)); color: #18222d; cursor: move; display: none; font: 700 14px/1.2 "Microsoft JhengHei", sans-serif; left: calc(50% + var(--label-offset-x, 0px)); padding: 6px 8px; position: absolute; touch-action: none; transform: translateX(-50%); white-space: nowrap; }
 .duty-point-dot.show-label .duty-point-label { display: block; }
 .map-placeholder { align-items: center; background-image: linear-gradient(#2c3b4a 1px, transparent 1px), linear-gradient(90deg, #2c3b4a 1px, transparent 1px); background-size: 32px 32px; border: 1px solid #43556a; color: #dae5f2; display: flex; flex-direction: column; height: 100%; justify-content: center; }
 .map-placeholder span { font-size: 22px; font-weight: 700; }
@@ -50,6 +50,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .route-list-row { align-items: center; border-bottom: 1px solid #314154; display: flex; justify-content: space-between; min-height: 42px; padding: 0 8px 0 12px; }
 .route-list-row:last-child { border-bottom: 0; }
 .route-list-row span { align-items: center; display: flex; min-width: 0; }
+.route-list-row.selected { background: #263d58; }
+.route-list-select { background: transparent !important; flex: 1; margin: 0 !important; padding: 8px 0 !important; text-align: left; }
 .route-list-row small { color: #93a4b7; font-size: 12px; margin-left: 8px; white-space: nowrap; }
 .route-list-row small { display: none; }
 .route-delete-button { background: transparent !important; color: #c7d2df; font-size: 22px; line-height: 1; margin: 0 !important; padding: 3px 8px !important; }

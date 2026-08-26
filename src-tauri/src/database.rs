@@ -134,6 +134,16 @@ pub fn delete_duty_route(path: &Path, route_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn update_duty_route_color(path: &Path, route_id: &str, color: &str) -> Result<(), String> {
+    if !["red", "orange", "yellow", "green", "blue", "purple"].contains(&color) {
+        return Err("不支援的路線顏色。".to_owned());
+    }
+    let connection = open_database(path)?;
+    let updated = connection.execute("UPDATE duty_routes SET color = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![route_id, color]).map_err(|error| format!("無法更新路線顏色：{error}"))?;
+    if updated == 0 { return Err("找不到要更新的勤務路線。".to_owned()); }
+    Ok(())
+}
+
 pub fn list_duty_points(path: &Path, plan_id: &str) -> Result<Vec<DutyPoint>, String> {
     let connection = open_database(path)?;
     let mut statement = connection.prepare("SELECT id, plan_id, point_code, point_name, note, color, latitude, longitude, visible FROM duty_points WHERE plan_id = ?1 ORDER BY point_code").map_err(|e| format!("無法讀取勤務點位：{e}"))?;
