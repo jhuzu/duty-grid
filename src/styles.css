@@ -52,6 +52,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .route-list-row span { align-items: center; display: flex; min-width: 0; }
 .route-list-row.selected { background: #263d58; }
 .route-list-select { background: transparent !important; flex: 1; margin: 0 !important; padding: 8px 0 !important; text-align: left; }
+.route-rename-form { align-items: center; display: flex; flex: 1; gap: 0; }
+.route-rename-form input { background: #0d141c; border: 1px solid #4f91c9; border-radius: 4px; color: #fff; font: inherit; min-width: 0; padding: 5px 7px; width: 100%; }
 .route-list-row small { color: #93a4b7; font-size: 12px; margin-left: 8px; white-space: nowrap; }
 .route-list-row small { display: none; }
 .route-delete-button { background: transparent !important; color: #c7d2df; font-size: 22px; line-height: 1; margin: 0 !important; padding: 3px 8px !important; }

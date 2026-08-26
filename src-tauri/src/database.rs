@@ -155,6 +155,15 @@ pub fn update_duty_route_color(path: &Path, route_id: &str, color: &str) -> Resu
     Ok(())
 }
 
+pub fn update_duty_route_name(path: &Path, route_id: &str, route_name: &str) -> Result<(), String> {
+    let route_name = route_name.trim();
+    if route_name.is_empty() { return Err("路線名稱不可空白。".to_owned()); }
+    let connection = open_database(path)?;
+    let updated = connection.execute("UPDATE duty_routes SET route_name = ?2 WHERE id = ?1", params![route_id, route_name]).map_err(|error| format!("無法更新路線名稱：{error}"))?;
+    if updated == 0 { return Err("找不到要更新的勤務路線。".to_owned()); }
+    Ok(())
+}
+
 pub fn list_common_routes(path: &Path) -> Result<Vec<CommonRoute>, String> {
     let connection = open_database(path)?;
     let mut statement = connection.prepare("SELECT id, route_name, color, geometry_json FROM common_routes ORDER BY created_at DESC").map_err(|error| format!("無法讀取常用路線：{error}"))?;
