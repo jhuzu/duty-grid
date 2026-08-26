@@ -40,8 +40,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .field-label { color: #b4c0d0; display: block; font-size: 13px; margin: 18px 0 6px; }
 .inspector input { background: #0d141c; border: 1px solid #43556a; border-radius: 6px; color: #fff; font: inherit; padding: 9px; width: 100%; }
 .personnel-filters { display: grid; gap: 8px; margin: 16px 0; }
+.personnel-inspector { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .personnel-filters select { background: #0d141c; border: 1px solid #43556a; border-radius: 6px; color: #fff; font: inherit; padding: 9px; width: 100%; }
 .assigned-personnel, .personnel-results, .personnel-import { display: grid; gap: 7px; margin-top: 18px; }
+.personnel-results { flex: 1; min-height: 0; }
+.personnel-scroll { display: grid; gap: 7px; min-height: 0; overflow-y: auto; padding-right: 4px; }
 .assigned-personnel > span, .personnel-import span { color: #93a4b7; font-size: 13px; }
 .assignment-row, .personnel-row { align-items: center; border: 1px solid #314154; border-radius: 6px; display: flex; gap: 8px; justify-content: space-between; padding: 7px 9px; }
 .assignment-row button, .personnel-row button { margin: 0; padding: 6px 8px; }

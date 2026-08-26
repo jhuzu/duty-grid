@@ -144,6 +144,11 @@ pub fn migrate(path: &Path) -> Result<(), String> {
         connection.execute_batch(include_str!("../migrations/0009_personnel_import_errors.sql")).map_err(|e| format!("無法套用人力匯入錯誤 migration：{e}"))?;
         connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [9]).map_err(|e| format!("無法記錄人力匯入錯誤 migration：{e}"))?;
     }
+    let cross_route_assignment_migration_done: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 10)", [], |row| row.get(0)).map_err(|e| format!("無法檢查跨路線人力配置 migration：{e}"))?;
+    if !cross_route_assignment_migration_done {
+        connection.execute_batch(include_str!("../migrations/0010_allow_cross_route_assignments.sql")).map_err(|e| format!("無法套用跨路線人力配置 migration：{e}"))?;
+        connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [10]).map_err(|e| format!("無法記錄跨路線人力配置 migration：{e}"))?;
+    }
     seed_personnel(&connection)?;
     Ok(())
 }
@@ -256,6 +261,12 @@ pub fn create_personnel_assignment(path: &Path, input: CreatePersonnelAssignment
 pub fn delete_personnel_assignment(path: &Path, assignment_id: &str) -> Result<(), String> {
     let connection = open_database(path)?;
     if connection.execute("DELETE FROM personnel_assignments WHERE id = ?1", [assignment_id]).map_err(|error| format!("無法移除人力配置：{error}"))? == 0 { return Err("找不到要移除的人力配置。".to_owned()); }
+    Ok(())
+}
+
+pub fn move_personnel_assignment(path: &Path, assignment_id: &str, duty_point_id: String) -> Result<(), String> {
+    let connection = open_database(path)?;
+    if connection.execute("UPDATE personnel_assignments SET duty_point_id = ?2 WHERE id = ?1", params![assignment_id, duty_point_id]).map_err(|error| format!("無法移動人力配置：{error}"))? == 0 { return Err("找不到要移動的人力配置。".to_owned()); }
     Ok(())
 }
 
