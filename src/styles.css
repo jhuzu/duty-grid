@@ -18,6 +18,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .map-line-style button.active { background: #1769aa; border-color: #4f91c9; }
 .map-route-colors { align-items: center; bottom: 74px; display: flex; gap: 7px; position: absolute; right: 14px; z-index: 3; }
 .map-route-colors .color-option { box-shadow: 0 1px 4px rgb(0 0 0 / 30%); }
+.route-inspector .color-options, .route-inspector .drawing-actions { display: none; }
+.route-inspector label.field-label:has(+ .color-options) { display: none; }
 .map-canvas { height: 100%; position: relative; width: 100%; }
 .route-overlay { height: 100%; left: 0; pointer-events: none; position: absolute; top: 0; width: 100%; z-index: 1; }
 .duty-point-dot { background: #f6c453; border: 2px solid #243242; border-radius: 50%; box-shadow: 0 1px 4px rgb(0 0 0 / 55%); cursor: grab; height: 16px; padding: 0; width: 16px; }
