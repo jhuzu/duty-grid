@@ -58,11 +58,22 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .personnel-row em { background: #263d58; border-radius: 10px; color: #b9d7f1; font-size: 10px; font-style: normal; font-weight: 600; padding: 2px 5px; white-space: nowrap; }
 .personnel-row small { color: #93a4b7; font-size: 12px; }
 .personnel-import input { background: transparent; border: 0; padding: 3px 0; }
-.preview-mode { grid-template-columns: 190px minmax(0, 1fr); grid-template-rows: 52px 240px minmax(0, 1fr) 28px; }
+.preview-mode { grid-template-columns: 190px minmax(0, 1fr); grid-template-rows: 52px 330px minmax(0, 1fr) 28px; }
 .preview-mode .sidebar { grid-row: 2 / 4; }
 .preview-mode .workspace { grid-column: 2; grid-row: 2; min-height: 0; }
 .preview-mode .inspector { border-left: 0; border-top: 1px solid #314154; grid-column: 2; grid-row: 3; overflow: auto; }
 .preview-mode .status-bar { grid-row: 4; }
+.map-preview-note { background: rgb(255 255 255 / 94%); border: 1px solid #c3ccd6; border-radius: 5px; color: #374452; font-size: 12px; left: 14px; max-width: 660px; padding: 7px 10px; position: absolute; top: 14px; z-index: 3; }
+.deployment-export-actions { display: flex; gap: 8px; justify-content: end; margin: -4px 0 14px; }
+.deployment-export-actions button { margin: 0; }
+.a4-preview { background: #fff; color: #111; margin: 0 auto; max-width: 1120px; min-height: 1056px; padding: 42px 46px; width: min(100%, 210mm); }
+.a4-preview h2 { font-size: 24px; margin: 0 0 18px; text-align: center; }
+.a4-preview > p { color: #222; font-size: 13px; margin: 6px 0; text-align: center; }
+.a4-preview table { border-collapse: collapse; font-size: 13px; margin-top: 22px; width: 100%; }
+.a4-preview th, .a4-preview td { border: 1px solid #222; min-width: 56px; padding: 8px 6px; text-align: center; vertical-align: middle; white-space: pre-line; }
+.a4-preview th { background: #f5f5f5; font-weight: 700; }
+.a4-preview tbody tr { cursor: pointer; }
+.a4-preview tbody tr:hover, .a4-preview tbody tr.selected { background: #dcecff; }
 .deployment-preview h2 { font-size: 20px; margin: 8px 0 14px; }
 .deployment-table-wrap { border: 1px solid #314154; border-radius: 7px; overflow: auto; }
 .deployment-preview table { border-collapse: collapse; min-width: 780px; width: 100%; }
@@ -125,4 +136,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .workspace { grid-row: 3; min-height: 420px; }
   .inspector { border-left: 0; border-top: 1px solid #314154; grid-row: 4; }
   .status-bar { grid-row: 5; }
+  .preview-mode { grid-template-columns: 1fr; grid-template-rows: 52px auto minmax(480px, 62vh) auto 28px; height: auto; min-height: 100vh; }
+  .preview-mode .sidebar { grid-row: 2; }
+  .preview-mode .workspace { grid-column: 1; grid-row: 3; min-height: 480px; }
+  .preview-mode .inspector { grid-column: 1; grid-row: 4; }
+  .preview-mode .status-bar { grid-row: 5; }
+  .map-preview-note { max-width: calc(100% - 28px); }
+  .a4-preview { overflow-x: auto; padding: 28px 18px; width: 100%; }
+  .a4-preview table { min-width: 900px; }
 }

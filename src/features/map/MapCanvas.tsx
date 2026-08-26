@@ -22,7 +22,7 @@ const roadLabelBasemapStyle: StyleSpecification = {
 const fallbackBasemapStyle = basemapStyle(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"]);
 
 export type MapDutyPoint = { id: string; pointCode: string; pointName: string; color: string; latitude: number; longitude: number };
-export function MapCanvas({ isDrawingRoute, manualVertexColor, manualVertices, onMapClick, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabels, points, routeLines, selectedPointId, showPersonnelLabels }: { isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onMapClick: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; opacity?: number }[]; selectedPointId: string | null; showPersonnelLabels: boolean }) {
+export function MapCanvas({ isDrawingRoute, manualVertexColor, manualVertices, onExportReady, onMapClick, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabels, points, routeLines, selectedPointId, showPersonnelLabels }: { isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onExportReady: (exporter: () => string | null) => void; onMapClick: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; opacity?: number }[]; selectedPointId: string | null; showPersonnelLabels: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const onMapClickRef = useRef(onMapClick);
@@ -31,6 +31,24 @@ export function MapCanvas({ isDrawingRoute, manualVertexColor, manualVertices, o
   const hasFallback = useRef(false);
 
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { onExportReady(() => {
+    const activeMap = map.current;
+    if (!activeMap) return null;
+    const source = activeMap.getCanvas();
+    const canvas = document.createElement("canvas");
+    canvas.width = source.width;
+    canvas.height = source.height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    try { context.drawImage(source, 0, 0); } catch { return null; }
+    const scale = source.width / Math.max(source.clientWidth, 1);
+    const colors: Record<string, string> = { red: "#df5050", orange: "#ed9a3a", yellow: "#f6c453", green: "#3faf71", blue: "#2d9cdb", purple: "#8966d1" };
+    context.scale(scale, scale);
+    routeLines.forEach((route) => { context.beginPath(); route.coordinates.forEach((coordinate, index) => { const pixel = activeMap.project(coordinate); if (index === 0) context.moveTo(pixel.x, pixel.y); else context.lineTo(pixel.x, pixel.y); }); context.strokeStyle = colors[route.color] ?? colors.blue; context.globalAlpha = route.opacity ?? 1; context.lineWidth = 5; context.lineCap = "round"; if (route.dashed) context.setLineDash([10, 8]); context.stroke(); context.setLineDash([]); });
+    context.globalAlpha = 1;
+    points.forEach((point) => { const pixel = activeMap.project([point.longitude, point.latitude]); context.beginPath(); context.fillStyle = colors[point.color] ?? colors.blue; context.strokeStyle = "#243242"; context.lineWidth = 2; context.arc(pixel.x, pixel.y, 8, 0, Math.PI * 2); context.fill(); context.stroke(); context.font = "bold 14px sans-serif"; context.fillStyle = "#18222d"; context.strokeStyle = "#ffffff"; context.lineWidth = 4; context.strokeText(point.pointCode, pixel.x + 12, pixel.y - 12); context.fillText(point.pointCode, pixel.x + 12, pixel.y - 12); });
+    return canvas.toDataURL("image/png");
+  }); }, [onExportReady, points, routeLines]);
   useEffect(() => { onRouteVertexRef.current = onRouteVertex; isDrawingRouteRef.current = isDrawingRoute; }, [isDrawingRoute, onRouteVertex]);
   useEffect(() => { const point = points.find((item) => item.id === selectedPointId); if (point && map.current) map.current.easeTo({ center: [point.longitude, point.latitude], duration: 350 }); }, [points, selectedPointId]);
 
