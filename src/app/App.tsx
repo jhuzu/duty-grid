@@ -105,7 +105,7 @@ export default function App() {
         </div>
       </header>
       <aside className="sidebar" aria-label="主要導覽">
-        {navigation.map((item) => <button className={activeNav === item ? "nav-item active" : "nav-item"} key={item} type="button" onClick={() => { setActiveNav(item); if (item !== "點位") setPendingCoordinate(null); }}>{item}</button>)}
+        {navigation.map((item) => <button className={activeNav === item ? "nav-item active" : "nav-item"} key={item} type="button" onClick={() => { setActiveNav(item); if (item !== "點位") setPendingCoordinate(null); if (item === "人力配置") setMessage("請先在地圖點選勤務點位，再從下方篩選並配置人員。"); else if (item === "人員資料") setMessage("安全維護部署表預覽會依目前勤務點位與人力配置產生。"); else if (item === "路線") setMessage("請選擇已儲存路線，或開始繪製新的勤務路線。"); else if (item === "點位") setMessage("請在地圖點選位置以新增勤務點位。"); }}>{item}</button>)}
       </aside>
       <section className="workspace" aria-label="地圖工作區">
         <MapCanvas isDrawingRoute={isDrawingRoute} manualVertexColor={routeColor} manualVertices={manualVertices} onMapClick={selectPointLocation} onPendingCancel={() => { setPendingCoordinate(null); setMessage("已取消放置暫存點位。"); }} onPointMoved={movePoint} onPointSelect={setSelectedPointId} onRouteVertex={addManualVertex} pendingColor={pointColor} pendingCoordinate={pendingCoordinate} personnelLabels={personnelLabels} points={points} routeLines={[...routes.map((route) => ({ color: route.color, dashed: route.lineStyle === "dashed", coordinates: routeCoordinates(route) })), ...(manualVertices.length > 1 ? [{ color: routeColor, coordinates: manualVertices, dashed: routeLineStyle !== "solid", opacity: 0.45 }] : [])].filter((route) => route.coordinates.length > 1)} selectedPointId={selectedPointId} showPersonnelLabels={showPersonnelLabels} />
