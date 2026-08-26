@@ -69,7 +69,7 @@ pub struct CommonRoute { pub id: String, pub route_name: String, pub color: Stri
 pub struct CreateCommonRouteInput { pub route_name: String, pub color: String, pub geometry: Vec<[f64; 2]> }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Personnel { pub id: String, pub personnel_code: String, pub radio_code: String, pub name: String, pub title: String, pub unit: String }
+pub struct Personnel { pub id: String, pub personnel_code: String, pub radio_code: String, pub name: String, pub title: String, pub unit: String, pub phone: String }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonnelAssignment { pub id: String, pub plan_id: String, pub personnel_id: String, pub duty_point_id: Option<String>, pub assigned_unit: String, pub assigned_title: String }
@@ -149,24 +149,37 @@ pub fn migrate(path: &Path) -> Result<(), String> {
         connection.execute_batch(include_str!("../migrations/0010_allow_cross_route_assignments.sql")).map_err(|e| format!("無法套用跨路線人力配置 migration：{e}"))?;
         connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [10]).map_err(|e| format!("無法記錄跨路線人力配置 migration：{e}"))?;
     }
+    let personnel_phone_migration_done: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 11)", [], |row| row.get(0)).map_err(|e| format!("無法檢查人員電話 migration：{e}"))?;
+    if !personnel_phone_migration_done {
+        connection.execute_batch(include_str!("../migrations/0011_personnel_phone.sql")).map_err(|e| format!("無法套用人員電話 migration：{e}"))?;
+        connection.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [11]).map_err(|e| format!("無法記錄人員電話 migration：{e}"))?;
+    }
     seed_personnel(&connection)?;
     Ok(())
 }
 
 fn seed_personnel(connection: &Connection) -> Result<(), String> {
     let count: i64 = connection.query_row("SELECT COUNT(*) FROM personnel", [], |row| row.get(0)).map_err(|error| format!("無法檢查人力種子資料：{error}"))?;
-    if count > 0 { return Ok(()); }
+    if count > 0 { return sync_seed_personnel_phones(connection); }
     let batch_id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立人力匯入批次：{error}"))?;
     connection.execute("INSERT INTO import_batches(id, source_file_name, total_rows, accepted_rows, rejected_rows) VALUES (?1, 'personnel-sample.csv', 56, 56, 0)", [batch_id.as_str()]).map_err(|error| format!("無法建立人力匯入批次：{error}"))?;
     let transaction = connection.unchecked_transaction().map_err(|error| format!("無法建立人力匯入交易：{error}"))?;
     for row in include_str!("../../data/seeds/personnel-sample.csv").lines().skip(1) {
         let columns = row.split(',').collect::<Vec<_>>();
-        if columns.len() != 5 { return Err("人力種子資料欄位不完整。".to_owned()); }
+        if columns.len() != 6 { return Err("人力種子資料欄位不完整。".to_owned()); }
         let id: String = transaction.query_row("SELECT lower(hex(randomblob(16)))", [], |result| result.get(0)).map_err(|error| format!("無法建立人員識別碼：{error}"))?;
-        let raw_row_json = serde_json::json!({ "personnel_code": columns[0], "radio_code": columns[1], "name": columns[2], "title": columns[3], "unit": columns[4] }).to_string();
-        transaction.execute("INSERT INTO personnel(id, personnel_code, radio_code, name, title, unit, import_batch_id, raw_row_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)", params![id, columns[0], columns[1], columns[2], columns[3], columns[4], batch_id, raw_row_json]).map_err(|error| format!("無法匯入人力種子資料：{error}"))?;
+        let raw_row_json = serde_json::json!({ "personnel_code": columns[0], "radio_code": columns[1], "name": columns[2], "title": columns[3], "unit": columns[4], "phone": columns[5] }).to_string();
+        transaction.execute("INSERT INTO personnel(id, personnel_code, radio_code, name, title, unit, phone, import_batch_id, raw_row_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![id, columns[0], columns[1], columns[2], columns[3], columns[4], columns[5], batch_id, raw_row_json]).map_err(|error| format!("無法匯入人力種子資料：{error}"))?;
     }
     transaction.commit().map_err(|error| format!("無法完成種子人力匯入：{error}"))
+}
+
+fn sync_seed_personnel_phones(connection: &Connection) -> Result<(), String> {
+    for row in include_str!("../../data/seeds/personnel-sample.csv").lines().skip(1) {
+        let columns = row.split(',').collect::<Vec<_>>();
+        if columns.len() == 6 { connection.execute("UPDATE personnel SET phone = ?2 WHERE personnel_code = ?1 AND phone = ''", params![columns[0], columns[5]]).map_err(|error| format!("無法更新種子人員電話：{error}"))?; }
+    }
+    Ok(())
 }
 
 pub fn list_duty_routes(path: &Path, plan_id: &str) -> Result<Vec<DutyRoute>, String> {
@@ -239,8 +252,8 @@ pub fn delete_common_route(path: &Path, route_id: &str) -> Result<(), String> {
 
 pub fn list_personnel(path: &Path) -> Result<Vec<Personnel>, String> {
     let connection = open_database(path)?;
-    let mut statement = connection.prepare("SELECT id, personnel_code, radio_code, name, title, unit FROM personnel ORDER BY unit, title, personnel_code").map_err(|error| format!("無法讀取人員資料：{error}"))?;
-    let rows = statement.query_map([], |row| Ok(Personnel { id: row.get(0)?, personnel_code: row.get(1)?, radio_code: row.get(2)?, name: row.get(3)?, title: row.get(4)?, unit: row.get(5)? })).map_err(|error| format!("無法查詢人員資料：{error}"))?;
+    let mut statement = connection.prepare("SELECT id, personnel_code, radio_code, name, title, unit, phone FROM personnel ORDER BY unit, title, personnel_code").map_err(|error| format!("無法讀取人員資料：{error}"))?;
+    let rows = statement.query_map([], |row| Ok(Personnel { id: row.get(0)?, personnel_code: row.get(1)?, radio_code: row.get(2)?, name: row.get(3)?, title: row.get(4)?, unit: row.get(5)?, phone: row.get(6)? })).map_err(|error| format!("無法查詢人員資料：{error}"))?;
     rows.collect::<Result<Vec<_>, _>>().map_err(|error| format!("無法讀取人員資料：{error}"))
 }
 
@@ -276,8 +289,8 @@ pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result
     let range = workbook.worksheet_range_at(0).ok_or_else(|| "Excel 沒有工作表。".to_owned())?.map_err(|error| format!("無法讀取工作表：{error}"))?;
     let mut rows = range.rows();
     let headers = rows.next().ok_or_else(|| "Excel 缺少欄位標題列。".to_owned())?.iter().map(|cell| cell.to_string().trim().trim_start_matches('\u{feff}').to_owned()).collect::<Vec<_>>();
-    let required = ["personnel_code", "radio_code", "name", "title", "unit"];
-    if required.iter().any(|field| !headers.iter().any(|header| header == field)) { return Err("Excel 必須包含 personnel_code、radio_code、name、title、unit 欄位。".to_owned()); }
+    let required = ["personnel_code", "radio_code", "name", "title", "unit", "phone"];
+    if required.iter().any(|field| !headers.iter().any(|header| header == field)) { return Err("Excel 必須包含 personnel_code、radio_code、name、title、unit、phone 欄位。".to_owned()); }
     let index_of = |field: &str| headers.iter().position(|header| header == field).expect("validated required header");
     let connection = open_database(path)?;
     let batch_id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立匯入批次：{error}"))?;
@@ -287,12 +300,12 @@ pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result
         if row.iter().all(|cell| cell.to_string().trim().is_empty()) { continue; }
         total_rows += 1;
         let value = |field: &str| row.get(index_of(field)).map(|cell| cell.to_string().trim().to_owned()).unwrap_or_default();
-        let personnel_code = value("personnel_code"); let radio_code = value("radio_code"); let name = value("name"); let title = value("title"); let unit = value("unit");
-        let raw_row_json = serde_json::json!({ "personnel_code": personnel_code, "radio_code": radio_code, "name": name, "title": title, "unit": unit }).to_string();
-        let error_reason = if personnel_code.is_empty() || radio_code.is_empty() || name.is_empty() || title.is_empty() || unit.is_empty() { Some("必填欄位不可空白。".to_owned()) } else { None };
+        let personnel_code = value("personnel_code"); let radio_code = value("radio_code"); let name = value("name"); let title = value("title"); let unit = value("unit"); let phone = value("phone");
+        let raw_row_json = serde_json::json!({ "personnel_code": personnel_code, "radio_code": radio_code, "name": name, "title": title, "unit": unit, "phone": phone }).to_string();
+        let error_reason = if personnel_code.is_empty() || radio_code.is_empty() || name.is_empty() || title.is_empty() || unit.is_empty() || phone.is_empty() { Some("必填欄位不可空白。".to_owned()) } else { None };
         if let Some(reason) = error_reason { rejected_rows += 1; connection.execute("INSERT INTO personnel_import_errors(id, import_batch_id, row_number, raw_row_json, error_reason) VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4)", params![batch_id, (offset + 2) as i64, raw_row_json, reason]).map_err(|error| format!("無法記錄匯入錯誤：{error}"))?; continue; }
         let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立人員識別碼：{error}"))?;
-        match connection.execute("INSERT INTO personnel(id, personnel_code, radio_code, name, title, unit, import_batch_id, raw_row_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)", params![id, personnel_code, radio_code, name, title, unit, batch_id, raw_row_json]) { Ok(_) => accepted_rows += 1, Err(error) => { rejected_rows += 1; connection.execute("INSERT INTO personnel_import_errors(id, import_batch_id, row_number, raw_row_json, error_reason) VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4)", params![batch_id, (offset + 2) as i64, raw_row_json, error.to_string()]).map_err(|record_error| format!("無法記錄匯入錯誤：{record_error}"))?; } }
+        match connection.execute("INSERT INTO personnel(id, personnel_code, radio_code, name, title, unit, phone, import_batch_id, raw_row_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![id, personnel_code, radio_code, name, title, unit, phone, batch_id, raw_row_json]) { Ok(_) => accepted_rows += 1, Err(error) => { rejected_rows += 1; connection.execute("INSERT INTO personnel_import_errors(id, import_batch_id, row_number, raw_row_json, error_reason) VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4)", params![batch_id, (offset + 2) as i64, raw_row_json, error.to_string()]).map_err(|record_error| format!("無法記錄匯入錯誤：{record_error}"))?; } }
     }
     connection.execute("UPDATE import_batches SET total_rows = ?2, accepted_rows = ?3, rejected_rows = ?4 WHERE id = ?1", params![batch_id, total_rows as i64, accepted_rows as i64, rejected_rows as i64]).map_err(|error| format!("無法完成匯入批次：{error}"))?;
     Ok(ImportPersonnelResult { total_rows, accepted_rows, rejected_rows })

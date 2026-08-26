@@ -1,0 +1,1 @@
+ALTER TABLE personnel ADD COLUMN phone TEXT NOT NULL DEFAULT '';
