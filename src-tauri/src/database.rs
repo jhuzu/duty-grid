@@ -232,7 +232,7 @@ pub fn list_duty_routes(path: &Path, plan_id: &str) -> Result<Vec<DutyRoute>, St
 
 pub fn create_duty_route(path: &Path, input: CreateDutyRouteInput) -> Result<DutyRoute, String> {
     if input.route_name.trim().is_empty() || input.point_ids.len() < 2 { return Err("請輸入路線名稱，並至少選擇兩個勤務點位。".to_owned()); }
-    if !["solid", "dashed", "arrow"].contains(&input.line_style.as_str()) { return Err("僅支援實線、虛線或箭頭線。".to_owned()); }
+    if !["solid", "dashed", "arrow", "dashed_arrow"].contains(&input.line_style.as_str()) { return Err("僅支援實線、虛線、實箭頭線或虛箭頭線。".to_owned()); }
     let mut connection = open_database(path)?; let tx = connection.transaction().map_err(|e| format!("無法建立路線交易：{e}"))?;
     let id: String = tx.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|e| format!("無法建立路線識別碼：{e}"))?;
     tx.execute("INSERT INTO duty_routes(id, plan_id, route_name, color, line_style) VALUES (?1, ?2, ?3, ?4, ?5)", params![id, input.plan_id, input.route_name.trim(), input.color, input.line_style]).map_err(|e| format!("無法保存勤務路線：{e}"))?;
@@ -260,7 +260,7 @@ pub fn update_duty_route_color(path: &Path, route_id: &str, color: &str) -> Resu
 }
 
 pub fn update_duty_route_line_style(path: &Path, route_id: &str, line_style: &str) -> Result<(), String> {
-    if !["solid", "dashed", "arrow"].contains(&line_style) { return Err("僅支援實線、虛線或箭頭線。".to_owned()); }
+    if !["solid", "dashed", "arrow", "dashed_arrow"].contains(&line_style) { return Err("僅支援實線、虛線、實箭頭線或虛箭頭線。".to_owned()); }
     let connection = open_database(path)?;
     let updated = connection.execute("UPDATE duty_routes SET line_style = ?2 WHERE id = ?1", params![route_id, line_style]).map_err(|error| format!("無法更新路線樣式：{error}"))?;
     if updated == 0 { return Err("找不到要更新的路線。".to_owned()); }
