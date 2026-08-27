@@ -171,7 +171,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .deployment-row-actions > strong { margin-right: 4px; }
 .deployment-row-actions .delete-button { margin: 0; }
 .a4-preview td:first-child { overflow: visible; position: relative; }
-.deployment-external-delete { align-items: center; display: inline-flex; font-size: 26px; height: 42px; justify-content: center; left: -54px; margin: 0; padding: 0; position: absolute; top: 50%; transform: translateY(-50%); width: 42px; z-index: 2; }
+.deployment-external-delete { align-items: center; display: inline-flex; font-size: 26px; height: 42px; justify-content: center; left: -40px; margin: 0; padding: 0; position: absolute; top: 50%; transform: translateY(-50%); width: 42px; z-index: 2; }
 .a4-preview tbody tr { cursor: pointer; }
 .a4-preview tbody tr:hover, .a4-preview tbody tr.selected { background: #dcecff; }
 .equipment-cell button { background: #fff; border: 1px solid #111; color: #111; cursor: pointer; font: inherit; line-height: 1.5; padding: 3px; text-align: center; width: 100%; white-space: pre-line; word-break: break-word; }
