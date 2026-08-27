@@ -172,7 +172,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .deployment-row-actions > strong { margin-right: 4px; }
 .deployment-row-actions .delete-button { margin: 0; }
 .a4-preview td:first-child { overflow: visible; position: relative; }
-.deployment-external-delete { align-items: center; display: inline-flex; font-size: 26px; height: 42px; justify-content: center; left: -40px; margin: 0; padding: 0; position: absolute; top: 50%; transform: translateY(-50%); width: 42px; z-index: 2; }
+.deployment-external-delete { align-items: center; display: inline-flex; font-size: 13px; height: 21px; justify-content: center; left: -75%; margin: 0; padding: 0; position: absolute; top: 50%; transform: translateY(-50%); width: 21px; z-index: 2; }
 .a4-preview tbody tr { cursor: pointer; }
 .a4-preview tbody tr:hover, .a4-preview tbody tr.selected { background: #dcecff; }
 .equipment-cell button { background: #fff; border: 1px solid #111; color: #111; cursor: pointer; font: inherit; line-height: 1.5; padding: 3px; text-align: center; width: 100%; white-space: pre-line; word-break: break-word; }
@@ -348,8 +348,9 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .map-police-summary caption { background: #fff; border: 1px solid #111; border-bottom: 0; font-weight: 700; padding: 4px 8px; }
 .map-police-summary th, .map-police-summary td { border: 1px solid #111; padding: 4px 8px; }
 .map-police-summary th { background: #f1f1f1; }
-.map-output-police-summary { background: rgb(255 255 255 / 94%); border: 1px solid #111; border-collapse: collapse; bottom: 54px; color: #111; font: 12px/1.35 "BiauKai", "DFKaiSho-SB", "DFKai-SB", "Kaiti TC", "STKaiti", serif; position: fixed; right: 54px; text-align: center; z-index: 7; }
-.map-output-police-summary th, .map-output-police-summary td { border: 1px solid #111; padding: 4px 8px; }
+.map-output-police-summary { background: rgb(255 255 255 / 94%); border: 1px solid #111; border-collapse: collapse; bottom: 54px; color: #111; font: 10px/1.25 "BiauKai", "DFKaiSho-SB", "DFKai-SB", "Kaiti TC", "STKaiti", serif; left: auto; min-width: 132px; position: fixed; right: 54px; text-align: center; top: auto; z-index: 7; }
+.map-output-police-summary caption { background: #fff; border: 1px solid #111; border-bottom: 0; font-size: 12px; font-weight: 700; padding: 3px 6px; }
+.map-output-police-summary th, .map-output-police-summary td { border: 1px solid #111; padding: 3px 5px; }
 .map-output-police-summary th { background: #f1f1f1; }
 
 /* Visual contract: dark surfaces always use light text; document surfaces always use dark text. */
