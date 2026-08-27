@@ -103,6 +103,16 @@ export function MapCanvas({ bearing = 0, fitToData = false, focusCenter, interac
       const point = markerByName.get(element.title);
       element.classList.toggle("hollow", point?.pointType === "hollow");
       element.classList.toggle("signal", point?.pointType === "signal");
+      if (point?.pointType === "hollow") {
+        element.style.setProperty("background", "#fff", "important");
+        element.style.setProperty("border", "3px solid #2d9cdb");
+      } else if (point?.pointType === "signal") {
+        element.style.setProperty("background", "transparent", "important");
+        element.style.setProperty("border", "0");
+      } else {
+        element.style.removeProperty("background");
+        element.style.removeProperty("border");
+      }
     });
   }, [isDrawingRoute, personnelLabelPointId, personnelLabels, points, selectedPointId, showPersonnelLabels, showPointLabels]);
 

@@ -32,7 +32,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .map-point-actions button.active { background: #124f82; }
 .point-symbol { align-items: center; background: #fff; border: 2px solid #43556a; border-radius: 50%; color: #17202b; display: inline-flex; font-size: 18px; height: 31px; justify-content: center; padding: 0; width: 31px; }
 .point-symbol.hollow { border: 3px solid #2d9cdb; color: #2d9cdb; font-size: 24px; }
-.point-symbol.signal { background: transparent; border: 0; border-radius: 0; font-size: 23px; }
+.point-symbol.signal { background: transparent; border: 0; border-radius: 0; font-size: 0; }
+.point-symbol.signal::after { background: radial-gradient(circle at 50% 18%, #ef5a58 0 2px, transparent 2.5px), radial-gradient(circle at 50% 50%, #f4c44e 0 2px, transparent 2.5px), radial-gradient(circle at 50% 82%, #48b879 0 2px, transparent 2.5px), #23313e; border-radius: 3px; content: ""; display: block; height: 24px; width: 14px; }
 .point-symbol.selected { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1769aa; }
 .intersection-search { display: flex; gap: 6px; position: absolute; right: 14px; top: 14px; z-index: 3; }
 .intersection-search input { background: rgb(255 255 255 / 96%); border: 1px solid #718194; border-radius: 5px; color: #17202b; font: 13px "Microsoft JhengHei", sans-serif; padding: 7px 9px; width: 190px; }
@@ -48,10 +49,10 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .duty-point-dot.drawing-disabled { cursor: default; opacity: .45; pointer-events: none; }
 .duty-point-dot.blue, .color-option.blue, .point-color-chip.blue { background: #2d9cdb; }.duty-point-dot.red, .color-option.red, .point-color-chip.red { background: #df5050; }.duty-point-dot.orange, .color-option.orange, .point-color-chip.orange { background: #ed9a3a; }.duty-point-dot.yellow, .color-option.yellow, .point-color-chip.yellow { background: #f6c453; }.duty-point-dot.green, .color-option.green, .point-color-chip.green { background: #3faf71; }.duty-point-dot.purple, .color-option.purple, .point-color-chip.purple { background: #8966d1; }
 .duty-point-dot.hollow { background: #fff !important; border: 3px solid #2d9cdb; }
-.duty-point-dot.signal { background: transparent !important; border: 0; box-shadow: none; color: initial; height: 24px; width: 24px; }
-.duty-point-dot.signal::after { content: "🚦"; font-size: 22px; line-height: 1; }
+.duty-point-dot.signal { background: transparent !important; border: 0; box-shadow: none; color: initial; height: 24px; width: 18px; }
+.duty-point-dot.signal::after { background: radial-gradient(circle at 50% 18%, #ef5a58 0 2px, transparent 2.5px), radial-gradient(circle at 50% 50%, #f4c44e 0 2px, transparent 2.5px), radial-gradient(circle at 50% 82%, #48b879 0 2px, transparent 2.5px), #23313e; border-radius: 3px; content: ""; display: block; height: 24px; width: 14px; }
 .signal-point-chip { align-items: center; background: transparent; border: 0; border-radius: 0; color: initial; display: inline-flex; height: 18px; justify-content: center; margin-right: 6px; width: 18px; }
-.signal-point-chip::after { content: "🚦"; font-size: 12px; line-height: 1; }
+.signal-point-chip::after { background: radial-gradient(circle at 50% 18%, #ef5a58 0 1.5px, transparent 2px), radial-gradient(circle at 50% 50%, #f4c44e 0 1.5px, transparent 2px), radial-gradient(circle at 50% 82%, #48b879 0 1.5px, transparent 2px), #23313e; border-radius: 2px; content: ""; height: 16px; width: 10px; }
 .point-color-chip.hollow { background: #fff; border: 2px solid #2d9cdb; }
 .duty-point-label { background: #fff; border: 1px solid #516170; border-radius: 4px; bottom: calc(22px + var(--label-offset-y, 0px)); color: #18222d; cursor: move; display: none; font: 700 14px/1.2 "Microsoft JhengHei", sans-serif; left: calc(50% + var(--label-offset-x, 0px)); padding: 6px 8px; position: absolute; touch-action: none; transform: translateX(-50%); white-space: nowrap; }
 .duty-point-dot.show-label .duty-point-label { display: block; }
