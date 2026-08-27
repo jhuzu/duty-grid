@@ -3,12 +3,11 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use calamine::{Reader, Xlsx};
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection};
 use serde::Serialize;
 
 pub struct AppState {
     pub database_path: PathBuf,
-    pub road_reference_path: PathBuf,
 }
 
 #[derive(Serialize)]
@@ -33,16 +32,6 @@ pub struct CreateDutyPlanInput {
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub description: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RoadReference {
-    pub intersection_name: String,
-    pub latitude: f64,
-    pub longitude: f64,
-    pub road_name: String,
-    pub cross_road_name: String,
 }
 
 #[derive(Serialize)]
@@ -95,11 +84,11 @@ pub struct WorkspaceState { pub plan_id: String, pub active_nav: String, pub sel
 #[serde(rename_all = "camelCase")]
 pub struct SaveWorkspaceStateInput { pub plan_id: String, pub active_nav: String, pub selected_point_id: Option<String>, pub selected_route_id: Option<String>, pub deployment_route_id: Option<String>, pub deployment_choices: serde_json::Value, pub map_output_title: String, pub map_output_zoom: f64, pub map_output_bearing: f64 }
 
-pub fn initialize_state(app_data_dir: PathBuf, road_reference_path: PathBuf) -> Result<AppState, String> {
+pub fn initialize_state(app_data_dir: PathBuf) -> Result<AppState, String> {
     fs::create_dir_all(&app_data_dir).map_err(|error| format!("無法建立應用程式資料目錄：{error}"))?;
     let database_path = app_data_dir.join("dutygrid.db");
     migrate(&database_path)?;
-    Ok(AppState { database_path, road_reference_path })
+    Ok(AppState { database_path })
 }
 
 fn open_database(path: &Path) -> Result<Connection, String> {
@@ -466,24 +455,6 @@ pub fn create_duty_plan(path: &Path, input: CreateDutyPlanInput) -> Result<DutyP
             end_time: row.get(4)?, description: row.get(5)?, status: row.get(6)?, created_at: row.get(7)?, updated_at: row.get(8)?,
         }),
     ).map_err(|error| format!("勤務計畫已保存，但無法讀回資料：{error}"))
-}
-
-pub fn lookup_intersection(path: &Path, road_name: &str, cross_road_name: &str) -> Result<Vec<RoadReference>, String> {
-    if !path.is_file() { return Err("找不到板橋路口參考資料庫。".to_owned()); }
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| format!("無法開啟板橋路口參考資料庫：{error}"))?;
-    let mut statement = connection.prepare(
-        "SELECT i.intersection_name, i.lat, i.lon, first_road.road_name, cross_road.road_name
-         FROM intersections i
-         JOIN intersection_roads first_road ON first_road.intersection_id = i.id
-         JOIN intersection_roads cross_road ON cross_road.intersection_id = i.id
-         WHERE first_road.road_name = ?1 AND cross_road.road_name = ?2
-         ORDER BY i.intersection_name LIMIT 20",
-    ).map_err(|error| format!("無法準備路口查詢：{error}"))?;
-    let rows = statement.query_map(params![road_name.trim(), cross_road_name.trim()], |row| Ok(RoadReference {
-        intersection_name: row.get(0)?, latitude: row.get(1)?, longitude: row.get(2)?, road_name: row.get(3)?, cross_road_name: row.get(4)?,
-    })).map_err(|error| format!("無法查詢板橋路口資料：{error}"))?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|error| format!("無法讀取板橋路口資料：{error}"))
 }
 
 #[cfg(test)]

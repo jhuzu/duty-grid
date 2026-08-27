@@ -36,9 +36,6 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .point-symbol.signal { background: transparent; border: 0; border-radius: 0; font-size: 0; }
 .point-symbol.signal::after { background: radial-gradient(circle at 50% 18%, #ef5a58 0 2px, transparent 2.5px), radial-gradient(circle at 50% 50%, #f4c44e 0 2px, transparent 2.5px), radial-gradient(circle at 50% 82%, #48b879 0 2px, transparent 2.5px), #23313e; border-radius: 3px; content: ""; display: block; height: 24px; width: 14px; }
 .point-symbol.selected { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1769aa; }
-.intersection-search { display: flex; gap: 6px; position: absolute; right: 14px; top: 14px; z-index: 3; }
-.intersection-search input { background: rgb(255 255 255 / 96%); border: 1px solid #718194; border-radius: 5px; color: #17202b; font: 13px "Microsoft JhengHei", sans-serif; padding: 7px 9px; width: 190px; }
-.intersection-search button { background: #1769aa; box-shadow: 0 1px 4px rgb(0 0 0 / 25%); font-size: 13px; padding: 7px 10px; }
 .map-point-reminder { background: rgb(109 45 45 / 95%); border: 1px solid #f18e8e; border-radius: 5px; bottom: 62px; color: #fff; font-size: 13px; font-weight: 700; margin: 0; padding: 8px 10px; position: absolute; right: 14px; z-index: 4; }
 .route-inspector .color-options, .route-inspector .drawing-actions { display: none; }
 .route-inspector label.field-label:has(+ .color-options) { display: none; }
