@@ -3,23 +3,13 @@ import { Map, Marker, NavigationControl, type Map as MapLibreMap, type StyleSpec
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const banqiaoCenter: [number, number] = [121.461, 25.012];
-function basemapStyle(tiles: string[]): StyleSpecification { return {
+function basemapStyle(tiles: string[], attribution: string): StyleSpecification { return {
   version: 8,
-  sources: { basemap: { type: "raster", tiles, tileSize: 256, attribution: "© OpenStreetMap contributors © CARTO" } },
+  sources: { basemap: { type: "raster", tiles, tileSize: 256, maxzoom: 19, attribution } },
   layers: [{ id: "basemap", type: "raster", source: "basemap", paint: { "raster-saturation": 0, "raster-contrast": 0, "raster-brightness-min": 0, "raster-brightness-max": 1 } }],
 }; }
-const roadLabelBasemapStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    basemap: { type: "raster", tiles: ["https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png", "https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors © CARTO" },
-    labels: { type: "raster", tiles: ["https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png", "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors © CARTO" },
-  },
-  layers: [
-    { id: "basemap", type: "raster", source: "basemap", paint: { "raster-saturation": 0, "raster-contrast": 0, "raster-brightness-min": 0, "raster-brightness-max": 1 } },
-    { id: "road-labels", type: "raster", source: "labels", paint: { "raster-opacity": 1 } },
-  ],
-};
-const fallbackBasemapStyle = basemapStyle(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"]);
+const nlscBasemapStyle = basemapStyle(["https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}"], "© 國土測繪中心");
+const fallbackBasemapStyle = basemapStyle(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "© OpenStreetMap contributors");
 
 export type MapDutyPoint = { id: string; pointCode: string; pointName: string; color: string; latitude: number; longitude: number };
 export function MapCanvas({ bearing = 0, fitToData = false, interactive = true, isDrawingRoute, manualVertexColor, manualVertices, onBearingChange, onExportReady, onMapClick, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabelPointId, personnelLabels, points, routeLines, selectedPointId, showNavigation = true, showPersonnelLabels, showPointLabels, zoomAdjustment = 0 }: { bearing?: number; fitToData?: boolean; interactive?: boolean; isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onBearingChange?: (bearing: number) => void; onExportReady: (exporter: () => string | null) => void; onMapClick: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabelPointId: string | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; opacity?: number }[]; selectedPointId: string | null; showNavigation?: boolean; showPersonnelLabels: boolean; showPointLabels: boolean; zoomAdjustment?: number }) {
@@ -76,7 +66,7 @@ export function MapCanvas({ bearing = 0, fitToData = false, interactive = true, 
       interactive,
       canvasContextAttributes: { preserveDrawingBuffer: true },
       zoom: 13,
-      style: roadLabelBasemapStyle,
+      style: nlscBasemapStyle,
     });
     if (interactive) {
       map.current.scrollZoom.enable();

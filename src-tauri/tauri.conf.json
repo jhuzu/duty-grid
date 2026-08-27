@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DutyGrid",
+  "productName": "勤務人力規劃系統",
   "version": "0.1.0",
   "identifier": "tw.gov.newtaipei.dutygrid",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "DutyGrid",
+        "title": "勤務人力規劃系統",
         "width": 1440,
         "height": 900,
         "minWidth": 1024,
