@@ -168,6 +168,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .deployment-table-tools, .deployment-row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; }
 .deployment-table-tools { min-height: 96px; padding: 18px 42px; }
 .deployment-table-tools label { align-items: center; display: flex; gap: 14px; }
+.deployment-table-add-action { display: flex; justify-content: center; min-width: 212px; }
+.deployment-table-add-action button { margin: 0; }
 .deployment-table-tools select { font: inherit; }
 .deployment-row-actions > strong { margin-right: 4px; }
 .deployment-row-actions .delete-button { margin: 0; }
@@ -408,6 +410,11 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .inspector .point-list-item:hover, .inspector .route-list-select:hover,
 .inspector .point-list-item.selected, .inspector .route-list-row.selected .route-list-select {
   background: #49483e !important;
+  color: #fff !important;
+}
+.preview-mode .inspector .deployment-route-tab.active {
+  background: #8966d1 !important;
+  border-color: #7452b9 !important;
   color: #fff !important;
 }
 
