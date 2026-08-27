@@ -165,8 +165,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .a4-preview th { background: #fff; font-family: inherit; font-weight: 500; line-height: 1.45; }
 .a4-preview select { background: transparent; border: 0; color: inherit; font: inherit; min-width: 0; padding: 4px 18px 4px 2px; text-align: center; width: 100%; }
 .a4-preview th:nth-child(1) { width: 6%; }.a4-preview th:nth-child(2) { width: 12%; }.a4-preview th:nth-child(3) { width: 12%; }.a4-preview th:nth-child(4) { width: 12%; }.a4-preview th:nth-child(5) { width: 7%; }.a4-preview th:nth-child(6) { width: 14%; }.a4-preview th:nth-child(7) { width: 11%; }.a4-preview th:nth-child(8) { width: 15%; }.a4-preview th:nth-child(9) { width: 11%; }
-.deployment-table-tools, .deployment-row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.deployment-table-tools label { align-items: center; display: flex; gap: 6px; }
+.deployment-table-tools, .deployment-row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; }
+.deployment-table-tools { min-height: 96px; padding: 18px 42px; }
+.deployment-table-tools label { align-items: center; display: flex; gap: 14px; }
 .deployment-table-tools select { font: inherit; }
 .deployment-row-actions > strong { margin-right: 4px; }
 .deployment-row-actions .delete-button { margin: 0; }
@@ -216,11 +217,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .route-point-option.selected { background: #263d58; outline: 1px solid #4f91c9; }
 .section-caption { color: #93a4b7; display: block; font-size: 13px; margin: 18px 0 7px; }
 .route-list { border: 0; border-radius: 0; overflow: hidden; }
-.route-list-row { align-items: center; border-bottom: 0; display: flex; justify-content: space-between; min-height: 42px; padding: 0 8px 0 12px; }
+.route-list-row { align-items: center; border-bottom: 0; display: flex; gap: 14px; justify-content: space-between; min-height: 42px; padding: 0 18px; }
 .route-list-row:last-child { border-bottom: 0; }
 .route-list-row span { align-items: center; display: flex; min-width: 0; }
 .route-list-row.selected { background: #263d58; }
 .route-list-select { background: transparent !important; flex: 1; margin: 0 !important; padding: 8px 0 !important; text-align: left; }
+.route-inspector .route-list { margin-inline: 12px; }
 .route-rename-form { align-items: center; display: flex; flex: 1; gap: 0; }
 .route-rename-form input { background: #0d141c; border: 1px solid #4f91c9; border-radius: 4px; color: #fff; font: inherit; min-width: 0; padding: 5px 7px; width: 100%; }
 .route-list-row small { color: #93a4b7; font-size: 12px; margin-left: 8px; white-space: nowrap; }
