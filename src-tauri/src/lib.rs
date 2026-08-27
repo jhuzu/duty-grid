@@ -128,6 +128,10 @@ fn export_deployment_xlsx(app: tauri::AppHandle, input: DeploymentExportInput) -
 fn save_exported_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
     fs::write(path, bytes).map_err(|error| format!("無法儲存匯出檔案：{error}"))
 }
+#[tauri::command]
+fn read_workspace_file(path: String) -> Result<Vec<u8>, String> {
+    fs::read(path).map_err(|error| format!("無法讀取工作區檔案：{error}"))
+}
 
 fn development_reference_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/reference/banqiao_roads.db")
@@ -144,7 +148,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir, road_reference_path).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, export_deployment_xlsx, save_exported_file])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, lookup_banqiao_intersection, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }
