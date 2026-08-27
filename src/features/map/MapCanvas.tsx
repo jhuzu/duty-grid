@@ -98,7 +98,7 @@ export function MapCanvas({ bearing = 0, fitToData = false, focusCenter, interac
 
   useEffect(() => {
     if (!container.current) return;
-    const markerByName = new Map(points.map((point) => [point.pointName, point]));
+    const markerByName = new globalThis.Map(points.map((point) => [point.pointName, point]));
     container.current.querySelectorAll<HTMLButtonElement>(".duty-point-dot").forEach((element) => {
       const point = markerByName.get(element.title);
       element.classList.toggle("hollow", point?.pointType === "hollow");
