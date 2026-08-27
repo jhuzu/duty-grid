@@ -25,6 +25,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .map-line-style button.active { background: #1769aa; border-color: #4f91c9; }
 .map-route-colors { align-items: center; bottom: 74px; display: flex; gap: 7px; position: absolute; right: 14px; z-index: 3; }
 .map-route-colors .color-option { box-shadow: 0 1px 4px rgb(0 0 0 / 30%); }
+.map-route-legend { align-items: center; background: rgb(255 255 255 / 93%); border: 1px solid #8695a4; border-radius: 5px; color: #1c2935; display: flex; font-size: 13px; font-weight: 700; gap: 8px; left: 14px; max-width: 250px; padding: 7px 9px; position: absolute; top: 14px; z-index: 3; }
 .map-point-options { align-items: center; bottom: 74px; display: flex; gap: 7px; position: absolute; right: 14px; z-index: 3; }
 .map-point-options .color-option { box-shadow: 0 1px 4px rgb(0 0 0 / 30%); }
 .map-point-actions { bottom: 18px; position: absolute; right: 14px; z-index: 3; }
@@ -218,6 +219,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .point-list-row { display: flex; gap: 6px; }
 .point-list-row .point-list-item { flex: 1; }
 .point-color-chip { border: 1px solid rgb(255 255 255 / 55%); border-radius: 50%; display: inline-block; height: 10px; margin-right: 8px; width: 10px; }
+.route-style-icon { --route-color: #2d9cdb; display: inline-block; height: 14px; margin-right: 9px; position: relative; vertical-align: middle; width: 34px; }
+.route-style-icon::before { background: var(--route-color); content: ""; height: 3px; left: 0; position: absolute; right: 0; top: 6px; }
+.route-style-icon.dashed::before { background: repeating-linear-gradient(90deg, var(--route-color) 0 8px, transparent 8px 13px); }
+.route-style-icon.arrow::after { border-bottom: 5px solid transparent; border-left: 8px solid var(--route-color); border-top: 5px solid transparent; content: ""; position: absolute; right: -1px; top: 3px; }
+.route-style-icon.red { --route-color: #df5050; }.route-style-icon.orange { --route-color: #ed9a3a; }.route-style-icon.yellow { --route-color: #f6c453; }.route-style-icon.green { --route-color: #3faf71; }.route-style-icon.blue { --route-color: #2d9cdb; }.route-style-icon.purple { --route-color: #8966d1; }
 .color-options { display: flex; gap: 10px; }
 .color-option { border: 2px solid transparent; border-radius: 50%; height: 28px; margin: 0 !important; padding: 0 !important; width: 28px; }
 .color-option.selected { border-color: #fff; box-shadow: 0 0 0 2px #1769aa; }

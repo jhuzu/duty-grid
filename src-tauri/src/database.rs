@@ -57,7 +57,7 @@ pub struct CreateDutyPointInput { pub plan_id: String, pub point_code: String, p
 pub struct DutyRoute { pub id: String, pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String>, pub route_type: String, pub geometry: Option<Vec<[f64; 2]>>, pub line_style: String }
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateDutyRouteInput { pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String> }
+pub struct CreateDutyRouteInput { pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String>, pub line_style: String }
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateManualRouteInput { pub plan_id: String, pub route_name: String, pub color: String, pub geometry: Vec<[f64; 2]> }
@@ -243,11 +243,12 @@ pub fn list_duty_routes(path: &Path, plan_id: &str) -> Result<Vec<DutyRoute>, St
 
 pub fn create_duty_route(path: &Path, input: CreateDutyRouteInput) -> Result<DutyRoute, String> {
     if input.route_name.trim().is_empty() || input.point_ids.len() < 2 { return Err("請輸入路線名稱，並至少選擇兩個勤務點位。".to_owned()); }
+    if !["solid", "dashed", "arrow"].contains(&input.line_style.as_str()) { return Err("僅支援實線、虛線或箭頭線。".to_owned()); }
     let mut connection = open_database(path)?; let tx = connection.transaction().map_err(|e| format!("無法建立路線交易：{e}"))?;
     let id: String = tx.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|e| format!("無法建立路線識別碼：{e}"))?;
-    tx.execute("INSERT INTO duty_routes(id, plan_id, route_name, color) VALUES (?1, ?2, ?3, ?4)", params![id, input.plan_id, input.route_name.trim(), input.color]).map_err(|e| format!("無法保存勤務路線：{e}"))?;
+    tx.execute("INSERT INTO duty_routes(id, plan_id, route_name, color, line_style) VALUES (?1, ?2, ?3, ?4, ?5)", params![id, input.plan_id, input.route_name.trim(), input.color, input.line_style]).map_err(|e| format!("無法保存勤務路線：{e}"))?;
     for (index, point_id) in input.point_ids.iter().enumerate() { tx.execute("INSERT INTO duty_route_stops(route_id, point_id, stop_order) VALUES (?1, ?2, ?3)", params![id, point_id, index as i64]).map_err(|e| format!("無法保存路線點位：{e}"))?; }
-    tx.commit().map_err(|e| format!("無法完成勤務路線保存：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: input.point_ids, route_type: "point_sequence".to_owned(), geometry: None, line_style: "solid".to_owned() })
+    tx.commit().map_err(|e| format!("無法完成勤務路線保存：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: input.point_ids, route_type: "point_sequence".to_owned(), geometry: None, line_style: input.line_style })
 }
 
 pub fn create_manual_route(path: &Path, input: CreateManualRouteInput) -> Result<DutyRoute, String> { if input.route_name.trim().is_empty() || input.geometry.len() < 2 { return Err("請輸入路線名稱，並繪製至少兩個節點。".to_owned()); } let connection = open_database(path)?; let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |r| r.get(0)).map_err(|e| format!("無法建立路線識別碼：{e}"))?; let geometry_json = serde_json::to_string(&input.geometry).map_err(|e| format!("無法保存手繪路線：{e}"))?; connection.execute("INSERT INTO duty_routes(id, plan_id, route_name, color, route_type, geometry_json) VALUES (?1,?2,?3,?4,'manual',?5)", params![id,input.plan_id,input.route_name.trim(),input.color,geometry_json]).map_err(|e| format!("無法保存手繪路線：{e}"))?; Ok(DutyRoute { id, plan_id: input.plan_id, route_name: input.route_name.trim().to_owned(), color: input.color, point_ids: vec![], route_type: "manual".to_owned(), geometry: Some(input.geometry), line_style: "solid".to_owned() }) }
@@ -270,7 +271,7 @@ pub fn update_duty_route_color(path: &Path, route_id: &str, color: &str) -> Resu
 }
 
 pub fn update_duty_route_line_style(path: &Path, route_id: &str, line_style: &str) -> Result<(), String> {
-    if !["solid", "dashed"].contains(&line_style) { return Err("僅支援實線或虛線。".to_owned()); }
+    if !["solid", "dashed", "arrow"].contains(&line_style) { return Err("僅支援實線、虛線或箭頭線。".to_owned()); }
     let connection = open_database(path)?;
     let updated = connection.execute("UPDATE duty_routes SET line_style = ?2 WHERE id = ?1", params![route_id, line_style]).map_err(|error| format!("無法更新路線樣式：{error}"))?;
     if updated == 0 { return Err("找不到要更新的路線。".to_owned()); }
@@ -503,7 +504,8 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         migrate(&path).expect("migration should succeed");
         let plan = create_duty_plan(&path, CreateDutyPlanInput { plan_name: "裝備測試".to_owned(), duty_date: None, start_time: None, end_time: None, description: None }).expect("plan should be saved");
-        let point = create_duty_point(&path, CreateDutyPointInput { plan_id: plan.id.clone(), point_code: "901".to_owned(), point_name: "測試崗哨".to_owned(), note: None, color: "red".to_owned(), point_type: "duty".to_owned(), latitude: 25.0, longitude: 121.0 }).expect("point should be saved");
+        let point = create_duty_point(&path, CreateDutyPointInput { plan_id: plan.id.clone(), point_code: "901".to_owned(), point_name: "測試崗哨".to_owned(), note: None, color: "red".to_owned(), point_type: "signal".to_owned(), latitude: 25.0, longitude: 121.0 }).expect("point should be saved");
+        assert_eq!(point.point_type, "signal");
         save_deployment_equipment(&path, SaveDeploymentEquipmentInput { plan_id: plan.id.clone(), duty_point_id: point.id, selected_items: vec!["制服".to_owned(), "無線電(空氣導管耳機)".to_owned()] }).expect("equipment should be saved");
         let saved = list_deployment_equipment(&path, &plan.id).expect("equipment should load");
         assert_eq!(saved[0].selected_items, ["制服", "無線電(空氣導管耳機)"]);

@@ -12,7 +12,18 @@ const nlscBasemapStyle = basemapStyle(["https://wmts.nlsc.gov.tw/wmts/EMAP/defau
 const fallbackBasemapStyle = basemapStyle(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "© OpenStreetMap contributors");
 
 export type MapDutyPoint = { id: string; pointCode: string; pointName: string; color: string; pointType: "duty" | "hollow" | "signal"; latitude: number; longitude: number };
-export function MapCanvas({ bearing = 0, fitToData = false, focusCenter, interactive = true, isDrawingRoute, manualVertexColor, manualVertices, onBearingChange, onExportReady, onMapClick, onMapPointerMove, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabelPointId, personnelLabels, points, routeLines, selectedPointId, showNavigation = true, showPersonnelLabels, showPointLabels, zoomAdjustment = 0 }: { bearing?: number; fitToData?: boolean; focusCenter?: [number, number]; interactive?: boolean; isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onBearingChange?: (bearing: number) => void; onExportReady: (exporter: () => string | null) => void; onMapClick: (latitude: number, longitude: number) => void; onMapPointerMove?: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabelPointId: string | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; opacity?: number }[]; selectedPointId: string | null; showNavigation?: boolean; showPersonnelLabels: boolean; showPointLabels: boolean; zoomAdjustment?: number }) {
+function applyPointSymbols(container: HTMLElement, points: MapDutyPoint[]) {
+  const markerByName = new globalThis.Map(points.map((point) => [point.pointName, point]));
+  container.querySelectorAll<HTMLButtonElement>(".duty-point-dot").forEach((element) => {
+    const point = markerByName.get(element.title);
+    element.classList.toggle("hollow", point?.pointType === "hollow");
+    element.classList.toggle("signal", point?.pointType === "signal");
+    if (point?.pointType === "hollow") { element.style.setProperty("background", "#fff", "important"); element.style.setProperty("border", "3px solid #2d9cdb"); }
+    else if (point?.pointType === "signal") { element.style.setProperty("background", "transparent", "important"); element.style.setProperty("border", "0"); }
+    else { element.style.removeProperty("background"); element.style.removeProperty("border"); }
+  });
+}
+export function MapCanvas({ bearing = 0, fitToData = false, focusCenter, interactive = true, isDrawingRoute, manualVertexColor, manualVertices, onBearingChange, onExportReady, onMapClick, onMapPointerMove, onPendingCancel, onPointMoved, onPointSelect, onRouteVertex, pendingColor, pendingCoordinate, personnelLabelPointId, personnelLabels, points, routeLines, selectedPointId, showNavigation = true, showPersonnelLabels, showPointLabels, zoomAdjustment = 0 }: { bearing?: number; fitToData?: boolean; focusCenter?: [number, number]; interactive?: boolean; isDrawingRoute: boolean; manualVertexColor: string; manualVertices: [number, number][]; onBearingChange?: (bearing: number) => void; onExportReady: (exporter: () => string | null) => void; onMapClick: (latitude: number, longitude: number) => void; onMapPointerMove?: (latitude: number, longitude: number) => void; onPendingCancel: () => void; onPointMoved: (point: MapDutyPoint, latitude: number, longitude: number) => void; onPointSelect: (pointId: string) => void; onRouteVertex: (latitude: number, longitude: number) => void; pendingColor: string; pendingCoordinate: { latitude: number; longitude: number } | null; personnelLabelPointId: string | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: { color: string; coordinates: [number, number][]; dashed?: boolean; arrow?: boolean; opacity?: number }[]; selectedPointId: string | null; showNavigation?: boolean; showPersonnelLabels: boolean; showPointLabels: boolean; zoomAdjustment?: number }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const onMapClickRef = useRef(onMapClick);
@@ -117,6 +128,16 @@ export function MapCanvas({ bearing = 0, fitToData = false, focusCenter, interac
   }, [isDrawingRoute, personnelLabelPointId, personnelLabels, points, selectedPointId, showPersonnelLabels, showPointLabels]);
 
   useEffect(() => {
+    if (!container.current) return;
+    const target = container.current;
+    const decorate = () => applyPointSymbols(target, points);
+    const observer = new MutationObserver(decorate);
+    observer.observe(target, { childList: true, subtree: true });
+    decorate();
+    return () => observer.disconnect();
+  }, [points]);
+
+  useEffect(() => {
     if (!map.current || !pendingCoordinate) return;
     const element = document.createElement("button"); element.className = `duty-point-dot pending ${pendingColor}`; element.title = "取消放置此點位"; element.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); onPendingCancel(); });
     const marker = new Marker({ element }).setLngLat([pendingCoordinate.longitude, pendingCoordinate.latitude]).addTo(map.current);
@@ -149,16 +170,22 @@ export function MapCanvas({ bearing = 0, fitToData = false, focusCenter, interac
       if (!activeMap) return;
       overlay.replaceChildren();
       overlay.setAttribute("viewBox", `0 0 ${activeMap.getCanvas().clientWidth} ${activeMap.getCanvas().clientHeight}`);
+      const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      overlay.append(defs);
       routeLines.forEach((route) => {
+        const color = route.color === "red" ? "#df5050" : route.color === "orange" ? "#ed9a3a" : route.color === "yellow" ? "#f6c453" : route.color === "green" ? "#3faf71" : route.color === "purple" ? "#8966d1" : "#2d9cdb";
+        const routeIndex = routeLines.indexOf(route);
+        if (route.arrow) { const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker"); marker.setAttribute("id", `route-arrow-${routeIndex}`); marker.setAttribute("markerWidth", "8"); marker.setAttribute("markerHeight", "8"); marker.setAttribute("refX", "7"); marker.setAttribute("refY", "4"); marker.setAttribute("orient", "auto"); const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", "M 0 0 L 8 4 L 0 8 z"); path.setAttribute("fill", color); marker.append(path); defs.append(marker); }
         const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         line.setAttribute("points", route.coordinates.map((coordinate) => { const pixel = activeMap.project(coordinate); return `${pixel.x},${pixel.y}`; }).join(" "));
         line.setAttribute("fill", "none");
-        line.setAttribute("stroke", route.color === "red" ? "#df5050" : route.color === "orange" ? "#ed9a3a" : route.color === "yellow" ? "#f6c453" : route.color === "green" ? "#3faf71" : route.color === "purple" ? "#8966d1" : "#2d9cdb");
+        line.setAttribute("stroke", color);
         line.setAttribute("stroke-width", "2.5");
         line.setAttribute("stroke-linecap", "round");
         line.setAttribute("stroke-linejoin", "round");
         line.setAttribute("opacity", String(route.opacity ?? 1));
         if (route.dashed) line.setAttribute("stroke-dasharray", "10 8");
+        if (route.arrow) line.setAttribute("marker-end", `url(#route-arrow-${routeIndex})`);
         overlay.append(line);
       });
     };
