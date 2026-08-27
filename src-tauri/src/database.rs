@@ -3,6 +3,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use calamine::{Reader, Xlsx};
+use encoding_rs::BIG5;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
@@ -71,6 +72,12 @@ pub struct ImportPersonnelInput { pub file_name: String, pub file_data: Vec<u8> 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportPersonnelResult { pub total_rows: usize, pub accepted_rows: usize, pub rejected_rows: usize }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonnelImportError { pub row_number: i64, pub error_reason: String, pub raw_row_json: String }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonnelImportLog { pub source_file_name: String, pub total_rows: i64, pub accepted_rows: i64, pub rejected_rows: i64, pub errors: Vec<PersonnelImportError> }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeploymentEquipment { pub plan_id: String, pub duty_point_id: String, pub selected_items: Vec<String> }
@@ -307,6 +314,15 @@ pub fn list_personnel(path: &Path) -> Result<Vec<Personnel>, String> {
     rows.collect::<Result<Vec<_>, _>>().map_err(|error| format!("無法讀取人員資料：{error}"))
 }
 
+pub fn latest_personnel_import_log(path: &Path) -> Result<Option<PersonnelImportLog>, String> {
+    let connection = open_database(path)?;
+    let batch = connection.query_row("SELECT id, source_file_name, total_rows, accepted_rows, rejected_rows FROM import_batches ORDER BY rowid DESC LIMIT 1", [], |row| Ok((row.get::<_, String>(0)?, PersonnelImportLog { source_file_name: row.get(1)?, total_rows: row.get(2)?, accepted_rows: row.get(3)?, rejected_rows: row.get(4)?, errors: Vec::new() }))).ok();
+    let Some((batch_id, mut log)) = batch else { return Ok(None); };
+    let mut statement = connection.prepare("SELECT row_number, error_reason, raw_row_json FROM personnel_import_errors WHERE import_batch_id = ?1 ORDER BY row_number LIMIT 100").map_err(|error| format!("無法讀取匯入錯誤紀錄：{error}"))?;
+    log.errors = statement.query_map([batch_id], |row| Ok(PersonnelImportError { row_number: row.get(0)?, error_reason: row.get(1)?, raw_row_json: row.get(2)? })).map_err(|error| format!("無法查詢匯入錯誤紀錄：{error}"))?.collect::<Result<Vec<_>, _>>().map_err(|error| format!("無法讀取匯入錯誤紀錄：{error}"))?;
+    Ok(Some(log))
+}
+
 pub fn list_personnel_assignments(path: &Path, plan_id: &str) -> Result<Vec<PersonnelAssignment>, String> {
     let connection = open_database(path)?;
     let mut statement = connection.prepare("SELECT id, plan_id, personnel_id, duty_point_id, assigned_unit, assigned_title FROM personnel_assignments WHERE plan_id = ?1 ORDER BY created_at").map_err(|error| format!("無法讀取人力配置：{error}"))?;
@@ -355,10 +371,47 @@ pub fn save_deployment_equipment(path: &Path, input: SaveDeploymentEquipmentInpu
     Ok(DeploymentEquipment { plan_id: input.plan_id, duty_point_id: input.duty_point_id, selected_items })
 }
 
+fn parse_csv_rows(file_data: &[u8]) -> Result<Vec<Vec<String>>, String> {
+    let content = match std::str::from_utf8(file_data) {
+        Ok(content) => content.to_owned(),
+        Err(_) => {
+            let (decoded, _, had_errors) = BIG5.decode(file_data);
+            if had_errors { return Err("CSV 編碼無法讀取；請另存為 UTF-8、Big5 或使用 .xlsx。".to_owned()); }
+            decoded.into_owned()
+        }
+    };
+    let content = content.trim_start_matches('\u{feff}');
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    let mut field = String::new();
+    let mut quoted = false;
+    let mut chars = content.chars().peekable();
+    while let Some(character) = chars.next() {
+        match character {
+            '"' if quoted && chars.peek() == Some(&'"') => { field.push('"'); chars.next(); }
+            '"' => quoted = !quoted,
+            ',' if !quoted => { row.push(field.trim().to_owned()); field.clear(); }
+            '\n' if !quoted => { row.push(field.trim().to_owned()); field.clear(); rows.push(row); row = Vec::new(); }
+            '\r' if !quoted => {}
+            value => field.push(value),
+        }
+    }
+    if quoted { return Err("CSV 的雙引號格式不完整。".to_owned()); }
+    if !field.is_empty() || !row.is_empty() { row.push(field.trim().to_owned()); rows.push(row); }
+    Ok(rows)
+}
+
 pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result<ImportPersonnelResult, String> {
-    if !input.file_name.to_lowercase().ends_with(".xlsx") { return Err("僅接受 .xlsx 人力資料檔。".to_owned()); }
-    let mut workbook = Xlsx::new(Cursor::new(input.file_data)).map_err(|error| format!("無法讀取 Excel：{error}"))?;
-    let range = workbook.worksheet_range_at(0).ok_or_else(|| "Excel 沒有工作表。".to_owned())?.map_err(|error| format!("無法讀取工作表：{error}"))?;
+    let file_name = input.file_name.to_lowercase();
+    let rows = if file_name.ends_with(".xlsx") {
+        let mut workbook = Xlsx::new(Cursor::new(input.file_data)).map_err(|error| format!("無法讀取 Excel：{error}"))?;
+        let range = workbook.worksheet_range_at(0).ok_or_else(|| "Excel 沒有工作表。".to_owned())?.map_err(|error| format!("無法讀取工作表：{error}"))?;
+        range.rows().map(|row| row.iter().map(|cell| cell.to_string()).collect::<Vec<_>>()).collect::<Vec<_>>()
+    } else if file_name.ends_with(".csv") {
+        parse_csv_rows(&input.file_data)?
+    } else {
+        return Err("僅接受 .csv 或 .xlsx 人力資料檔。".to_owned());
+    };
     let required = ["personnel_code", "radio_code", "name", "title", "unit", "phone"];
     let aliases = |field: &str| match field {
         "personnel_code" => &["personnel_code", "personnel-number", "員編"][..],
@@ -369,7 +422,7 @@ pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result
         "phone" => &["phone", "聯絡電話"][..],
         _ => &[][..],
     };
-    let (header_row_index, headers) = range.rows().take(10).enumerate().find_map(|(index, row)| {
+    let (header_row_index, headers) = rows.iter().take(10).enumerate().find_map(|(index, row)| {
         let headers = row.iter().map(|cell| cell.to_string().trim().trim_start_matches('\u{feff}').to_owned()).collect::<Vec<_>>();
         let has_header = |field: &str| headers.iter().any(|header| aliases(field).contains(&header.as_str()));
         required.iter().all(|field| has_header(field)).then_some((index, headers))
@@ -379,7 +432,7 @@ pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result
     let batch_id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立匯入批次：{error}"))?;
     connection.execute("INSERT INTO import_batches(id, source_file_name) VALUES (?1, ?2)", params![batch_id, input.file_name]).map_err(|error| format!("無法建立匯入批次：{error}"))?;
     let mut total_rows = 0usize; let mut accepted_rows = 0usize; let mut rejected_rows = 0usize;
-    for (offset, row) in range.rows().enumerate().skip(header_row_index + 1) {
+    for (offset, row) in rows.iter().enumerate().skip(header_row_index + 1) {
         if row.iter().all(|cell| cell.to_string().trim().is_empty()) { continue; }
         total_rows += 1;
         let value = |field: &str| row.get(index_of(field)).map(|cell| cell.to_string().trim().to_owned()).unwrap_or_default();
@@ -387,8 +440,17 @@ pub fn import_personnel_xlsx(path: &Path, input: ImportPersonnelInput) -> Result
         let raw_row_json = serde_json::json!({ "personnel_code": personnel_code, "radio_code": radio_code, "name": name, "title": title, "unit": unit, "phone": phone }).to_string();
         let error_reason = if personnel_code.is_empty() || radio_code.is_empty() || name.is_empty() || title.is_empty() || unit.is_empty() || phone.is_empty() { Some("必填欄位不可空白。".to_owned()) } else { None };
         if let Some(reason) = error_reason { rejected_rows += 1; connection.execute("INSERT INTO personnel_import_errors(id, import_batch_id, row_number, raw_row_json, error_reason) VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4)", params![batch_id, (offset + 1) as i64, raw_row_json, reason]).map_err(|error| format!("無法記錄匯入錯誤：{error}"))?; continue; }
-        let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立人員識別碼：{error}"))?;
-        match connection.execute("INSERT INTO personnel(id, personnel_code, radio_code, name, title, unit, phone, import_batch_id, raw_row_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![id, personnel_code, radio_code, name, title, unit, phone, batch_id, raw_row_json]) { Ok(_) => accepted_rows += 1, Err(error) => { rejected_rows += 1; connection.execute("INSERT INTO personnel_import_errors(id, import_batch_id, row_number, raw_row_json, error_reason) VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4)", params![batch_id, (offset + 1) as i64, raw_row_json, error.to_string()]).map_err(|record_error| format!("無法記錄匯入錯誤：{record_error}"))?; } }
+        let radio_match: Option<String> = connection.query_row("SELECT id FROM personnel WHERE radio_code = ?1", [&radio_code], |row| row.get(0)).ok();
+        let personnel_match: Option<String> = connection.query_row("SELECT id FROM personnel WHERE personnel_code = ?1", [&personnel_code], |row| row.get(0)).ok();
+        let save_result = match (radio_match, personnel_match) {
+            (Some(radio_id), Some(personnel_id)) if radio_id != personnel_id => Err("員編與無線電代號分別對應不同既有人員，無法安全更新。".to_owned()),
+            (Some(id), _) | (_, Some(id)) => connection.execute("UPDATE personnel SET personnel_code = ?2, radio_code = ?3, name = ?4, title = ?5, unit = ?6, phone = ?7, import_batch_id = ?8, raw_row_json = ?9 WHERE id = ?1", params![id, personnel_code, radio_code, name, title, unit, phone, batch_id, raw_row_json]).map(|_| ()).map_err(|error| error.to_string()),
+            (None, None) => {
+                let id: String = connection.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0)).map_err(|error| format!("無法建立人員識別碼：{error}"))?;
+                connection.execute("INSERT INTO personnel(id, personnel_code, radio_code, name, title, unit, phone, import_batch_id, raw_row_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![id, personnel_code, radio_code, name, title, unit, phone, batch_id, raw_row_json]).map(|_| ()).map_err(|error| error.to_string())
+            }
+        };
+        match save_result { Ok(()) => accepted_rows += 1, Err(error) => { rejected_rows += 1; connection.execute("INSERT INTO personnel_import_errors(id, import_batch_id, row_number, raw_row_json, error_reason) VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4)", params![batch_id, (offset + 1) as i64, raw_row_json, error]).map_err(|record_error| format!("無法記錄匯入錯誤：{record_error}"))?; } }
     }
     connection.execute("UPDATE import_batches SET total_rows = ?2, accepted_rows = ?3, rejected_rows = ?4 WHERE id = ?1", params![batch_id, total_rows as i64, accepted_rows as i64, rejected_rows as i64]).map_err(|error| format!("無法完成匯入批次：{error}"))?;
     Ok(ImportPersonnelResult { total_rows, accepted_rows, rejected_rows })
@@ -480,6 +542,23 @@ mod tests {
         save_deployment_equipment(&path, SaveDeploymentEquipmentInput { plan_id: plan.id.clone(), duty_point_id: point.id, selected_items: vec!["制服".to_owned(), "無線電(空氣導管耳機)".to_owned()] }).expect("equipment should be saved");
         let saved = list_deployment_equipment(&path, &plan.id).expect("equipment should load");
         assert_eq!(saved[0].selected_items, ["制服", "無線電(空氣導管耳機)"]);
+        let _ = std::fs::remove_file(path);
+    }
+    #[test]
+    fn csv_personnel_import_accepts_chinese_headers_and_quoted_values() {
+        let path = std::env::temp_dir().join(format!("dutygrid-personnel-csv-test-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        migrate(&path).expect("migration should succeed");
+        let result = import_personnel_xlsx(&path, ImportPersonnelInput {
+            file_name: "人力資料.csv".to_owned(),
+            file_data: "\u{feff}員編,無線電代號,姓名,職稱,所屬單位,聯絡電話\nA001,R01,王小明,警員,第一分局,0912345678\nA002,R02,李小華,巡佐,\"第二,分局\",0987654321\n".as_bytes().to_vec(),
+        }).expect("csv should import");
+        assert_eq!((result.total_rows, result.accepted_rows, result.rejected_rows), (2, 2, 0));
+        let repeated = import_personnel_xlsx(&path, ImportPersonnelInput {
+            file_name: "人力資料.csv".to_owned(),
+            file_data: "員編,無線電代號,姓名,職稱,所屬單位,聯絡電話\nA001,R01,王小明,警員,第一分局,0912345678\nA002,R02,李小華,巡佐,第二分局,0987654321\n".as_bytes().to_vec(),
+        }).expect("repeated csv should update existing personnel");
+        assert_eq!((repeated.total_rows, repeated.accepted_rows, repeated.rejected_rows), (2, 2, 0));
         let _ = std::fs::remove_file(path);
     }
 }

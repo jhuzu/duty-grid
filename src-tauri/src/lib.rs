@@ -2,7 +2,7 @@ mod database;
 
 use std::{fs::{self, File}, io::{Cursor, Read, Write}, path::PathBuf};
 
-use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, CreatePersonnelAssignmentInput, DeploymentEquipment, DutyPlan, DutyPoint, DutyRoute, ImportPersonnelInput, ImportPersonnelResult, Personnel, PersonnelAssignment, SaveDeploymentEquipmentInput, SaveWorkspaceStateInput, WorkspaceState};
+use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, CreatePersonnelAssignmentInput, DeploymentEquipment, DutyPlan, DutyPoint, DutyRoute, ImportPersonnelInput, ImportPersonnelResult, Personnel, PersonnelAssignment, PersonnelImportLog, SaveDeploymentEquipmentInput, SaveWorkspaceStateInput, WorkspaceState};
 use serde::Deserialize;
 use tauri::{Manager, State};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
@@ -84,6 +84,29 @@ fn move_personnel_assignment(state: State<'_, AppState>, assignment_id: String, 
 #[tauri::command]
 fn import_personnel_xlsx(state: State<'_, AppState>, input: ImportPersonnelInput) -> Result<ImportPersonnelResult, String> { database::import_personnel_xlsx(&state.database_path, input) }
 #[tauri::command]
+fn import_personnel_file(state: State<'_, AppState>, path: String) -> Result<ImportPersonnelResult, String> {
+    let file_path = PathBuf::from(path);
+    let file_name = file_path.file_name().and_then(|name| name.to_str()).ok_or_else(|| "無法取得人力資料檔名。".to_owned())?.to_owned();
+    let file_data = fs::read(&file_path).map_err(|error| format!("無法讀取人力資料檔：{error}"))?;
+    database::import_personnel_xlsx(&state.database_path, ImportPersonnelInput { file_name, file_data })
+}
+#[tauri::command]
+fn import_default_personnel_file(state: State<'_, AppState>) -> Result<ImportPersonnelResult, String> {
+    let data_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data");
+    let mut files = fs::read_dir(&data_directory).map_err(|error| format!("無法讀取測試資料目錄 {}：{error}", data_directory.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && matches!(path.extension().and_then(|extension| extension.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("xlsx") | Some("csv")))
+        .collect::<Vec<_>>();
+    files.sort_by_key(|path| (if path.extension().and_then(|extension| extension.to_str()).is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx")) { 0 } else { 1 }, path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default()));
+    let path = files.into_iter().next().ok_or_else(|| format!("找不到測試人力資料。請將 .xlsx 或 .csv 放到 {}；會優先讀取 .xlsx。", data_directory.display()))?;
+    let file_name = path.file_name().and_then(|name| name.to_str()).ok_or_else(|| "無法取得測試資料檔名。".to_owned())?.to_owned();
+    let file_data = fs::read(&path).map_err(|error| format!("無法讀取測試人力資料檔：{error}"))?;
+    database::import_personnel_xlsx(&state.database_path, ImportPersonnelInput { file_name, file_data })
+}
+#[tauri::command]
+fn latest_personnel_import_log(state: State<'_, AppState>) -> Result<Option<PersonnelImportLog>, String> { database::latest_personnel_import_log(&state.database_path) }
+#[tauri::command]
 fn list_deployment_equipment(state: State<'_, AppState>, plan_id: String) -> Result<Vec<DeploymentEquipment>, String> { database::list_deployment_equipment(&state.database_path, &plan_id) }
 #[tauri::command]
 fn save_deployment_equipment(state: State<'_, AppState>, input: SaveDeploymentEquipmentInput) -> Result<DeploymentEquipment, String> { database::save_deployment_equipment(&state.database_path, input) }
@@ -138,7 +161,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }

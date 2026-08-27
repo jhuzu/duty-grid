@@ -800,6 +800,7 @@ name = "dutygrid"
 version = "0.1.0"
 dependencies = [
  "calamine",
+ "encoding_rs",
  "rusqlite",
  "rust_xlsxwriter",
  "serde",
