@@ -206,6 +206,12 @@ pub fn save_workspace_state(path: &Path, input: SaveWorkspaceStateInput) -> Resu
     Ok(())
 }
 
+pub fn delete_workspace_state(path: &Path, plan_id: &str) -> Result<(), String> {
+    let connection = open_database(path)?;
+    connection.execute("DELETE FROM workspace_states WHERE plan_id = ?1", [plan_id]).map_err(|error| format!("無法刪除勤務工作區快取：{error}"))?;
+    Ok(())
+}
+
 fn seed_personnel(connection: &Connection) -> Result<(), String> {
     let count: i64 = connection.query_row("SELECT COUNT(*) FROM personnel", [], |row| row.get(0)).map_err(|error| format!("無法檢查人力種子資料：{error}"))?;
     if count > 0 { return sync_seed_personnel_phones(connection); }
@@ -483,6 +489,15 @@ pub fn move_duty_point(path: &Path, point_id: &str, latitude: f64, longitude: f6
     let connection = open_database(path)?;
     let updated = connection.execute("UPDATE duty_points SET latitude = ?2, longitude = ?3, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![point_id, latitude, longitude]).map_err(|e| format!("無法移動勤務點位：{e}"))?;
     if updated == 0 { return Err("找不到要移動的勤務點位。".to_owned()); }
+    Ok(())
+}
+
+pub fn update_duty_point_name(path: &Path, point_id: &str, point_name: &str) -> Result<(), String> {
+    let point_name = point_name.trim();
+    if point_name.is_empty() { return Err("點位名稱不可空白。".to_owned()); }
+    let connection = open_database(path)?;
+    let updated = connection.execute("UPDATE duty_points SET point_name = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![point_id, point_name]).map_err(|e| format!("無法更新勤務點位名稱：{e}"))?;
+    if updated == 0 { return Err("找不到要改名的勤務點位。".to_owned()); }
     Ok(())
 }
 

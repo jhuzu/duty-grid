@@ -18,6 +18,7 @@ struct DeploymentExportRow {
     personnel_text: String,
     radio_text: String,
     equipment_text: String,
+    coordinator_phone: String,
 }
 
 #[derive(Deserialize)]
@@ -51,6 +52,8 @@ fn create_duty_point(state: State<'_, AppState>, input: CreateDutyPointInput) ->
 fn delete_duty_point(state: State<'_, AppState>, point_id: String) -> Result<(), String> { database::delete_duty_point(&state.database_path, &point_id) }
 #[tauri::command]
 fn move_duty_point(state: State<'_, AppState>, point_id: String, latitude: f64, longitude: f64) -> Result<(), String> { database::move_duty_point(&state.database_path, &point_id, latitude, longitude) }
+#[tauri::command]
+fn update_duty_point_name(state: State<'_, AppState>, point_id: String, point_name: String) -> Result<(), String> { database::update_duty_point_name(&state.database_path, &point_id, &point_name) }
 #[tauri::command]
 fn list_duty_routes(state: State<'_, AppState>, plan_id: String) -> Result<Vec<DutyRoute>, String> { database::list_duty_routes(&state.database_path, &plan_id) }
 #[tauri::command]
@@ -114,6 +117,8 @@ fn save_deployment_equipment(state: State<'_, AppState>, input: SaveDeploymentEq
 fn load_workspace_state(state: State<'_, AppState>, plan_id: String) -> Result<Option<WorkspaceState>, String> { database::load_workspace_state(&state.database_path, &plan_id) }
 #[tauri::command]
 fn save_workspace_state(state: State<'_, AppState>, input: SaveWorkspaceStateInput) -> Result<(), String> { database::save_workspace_state(&state.database_path, input) }
+#[tauri::command]
+fn delete_workspace_state(state: State<'_, AppState>, plan_id: String) -> Result<(), String> { database::delete_workspace_state(&state.database_path, &plan_id) }
 
 fn xml_escape(value: &str) -> String { value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;") }
 fn replace_cell_value(xml: &mut String, cell: &str, style: u8, value: &str) -> Result<(), String> {
@@ -136,8 +141,8 @@ fn export_deployment_xlsx(app: tauri::AppHandle, input: DeploymentExportInput) -
     let mut source = ZipArchive::new(file).map_err(|error| format!("無法開啟 Excel 範本：{error}"))?;
     let mut worksheet = String::new();
     source.by_name("xl/worksheets/sheet1.xml").map_err(|error| format!("無法讀取部署表工作表：{error}"))?.read_to_string(&mut worksheet).map_err(|error| format!("無法讀取部署表資料：{error}"))?;
-    for row_number in 7..=39 { for (column, style) in [("A", 7), ("B", 8), ("C", 8), ("D", 8), ("E", 9), ("F", 8), ("G", 8), ("H", 8)] { replace_cell_value(&mut worksheet, &format!("{column}{row_number}"), style, "")?; } }
-    for (offset, row) in input.rows.iter().enumerate() { let number = offset + 7; for (column, style, value) in [("A", 7, row.sequence.to_string()), ("B", 8, row.post_type.clone()), ("C", 8, row.point_name.clone()), ("D", 8, row.unit.clone()), ("E", 9, row.police_count.to_string()), ("F", 8, row.personnel_text.clone()), ("G", 8, row.radio_text.clone()), ("H", 8, row.equipment_text.clone())] { replace_cell_value(&mut worksheet, &format!("{column}{number}"), style, &value)?; } }
+    for row_number in 7..=39 { for (column, style) in [("A", 7), ("B", 8), ("C", 8), ("D", 8), ("E", 9), ("F", 8), ("G", 8), ("H", 8), ("I", 10)] { replace_cell_value(&mut worksheet, &format!("{column}{row_number}"), style, "")?; } }
+    for (offset, row) in input.rows.iter().enumerate() { let number = offset + 7; for (column, style, value) in [("A", 7, row.sequence.to_string()), ("B", 8, row.post_type.clone()), ("C", 8, row.point_name.clone()), ("D", 8, row.unit.clone()), ("E", 9, row.police_count.to_string()), ("F", 8, row.personnel_text.clone()), ("G", 8, row.radio_text.clone()), ("H", 8, row.equipment_text.clone()), ("I", 10, row.coordinator_phone.clone())] { replace_cell_value(&mut worksheet, &format!("{column}{number}"), style, &value)?; } }
     let mut output = ZipWriter::new(Cursor::new(Vec::new()));
     for index in 0..source.len() { let mut entry = source.by_index(index).map_err(|error| format!("無法讀取範本內容：{error}"))?; let name = entry.name().to_string(); output.start_file(&name, SimpleFileOptions::default().compression_method(CompressionMethod::Deflated)).map_err(|error| format!("無法建立匯出內容：{error}"))?; if name == "xl/worksheets/sheet1.xml" { output.write_all(worksheet.as_bytes()).map_err(|error| format!("無法寫入部署表資料：{error}"))?; } else { let mut bytes = Vec::new(); entry.read_to_end(&mut bytes).map_err(|error| format!("無法讀取範本內容：{error}"))?; output.write_all(&bytes).map_err(|error| format!("無法寫入範本內容：{error}"))?; } }
     Ok(output.finish().map_err(|error| format!("無法完成 Excel 匯出：{error}"))?.into_inner())
@@ -161,7 +166,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, update_duty_point_name, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, delete_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }
