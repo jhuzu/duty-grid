@@ -2,7 +2,7 @@ mod database;
 
 use std::{fs::{self, File}, io::{Cursor, Read, Write}, path::PathBuf};
 
-use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, CreatePersonnelAssignmentInput, DeploymentEquipment, DutyPlan, DutyPoint, DutyRoute, ImportPersonnelInput, ImportPersonnelResult, Personnel, PersonnelAssignment, PersonnelImportLog, SaveDeploymentEquipmentInput, SaveWorkspaceStateInput, WorkspaceState};
+use database::{AppState, CommonRoute, CreateCommonRouteInput, CreateDutyPlanInput, CreateDutyPointInput, CreateDutyRouteInput, CreateManualRouteInput, CreatePersonnelAssignmentInput, DeploymentEquipment, DutyPlan, DutyPoint, DutyRoute, ImportPersonnelInput, ImportPersonnelResult, Personnel, PersonnelAssignment, PersonnelImportLog, SaveDeploymentEquipmentInput, SaveWorkspaceStateInput, UpdateDutyPointInput, WorkspaceState};
 use serde::Deserialize;
 use tauri::{Manager, State};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
@@ -54,6 +54,8 @@ fn delete_duty_point(state: State<'_, AppState>, point_id: String) -> Result<(),
 fn move_duty_point(state: State<'_, AppState>, point_id: String, latitude: f64, longitude: f64) -> Result<(), String> { database::move_duty_point(&state.database_path, &point_id, latitude, longitude) }
 #[tauri::command]
 fn update_duty_point_name(state: State<'_, AppState>, point_id: String, point_name: String) -> Result<(), String> { database::update_duty_point_name(&state.database_path, &point_id, &point_name) }
+#[tauri::command]
+fn update_duty_point(state: State<'_, AppState>, point_id: String, input: UpdateDutyPointInput) -> Result<DutyPoint, String> { database::update_duty_point(&state.database_path, &point_id, input) }
 #[tauri::command]
 fn list_duty_routes(state: State<'_, AppState>, plan_id: String) -> Result<Vec<DutyRoute>, String> { database::list_duty_routes(&state.database_path, &plan_id) }
 #[tauri::command]
@@ -166,7 +168,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, update_duty_point_name, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, delete_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, update_duty_point_name, update_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, delete_workspace_state, export_deployment_xlsx, save_exported_file, read_workspace_file])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }

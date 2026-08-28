@@ -42,6 +42,9 @@ pub struct DutyPoint { pub id: String, pub plan_id: String, pub point_code: Stri
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDutyPointInput { pub plan_id: String, pub point_code: String, pub point_name: String, pub note: Option<String>, pub color: String, pub point_type: String, pub latitude: f64, pub longitude: f64 }
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDutyPointInput { pub point_code: String, pub point_name: String, pub note: Option<String>, pub color: String, pub point_type: String, pub latitude: f64, pub longitude: f64 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DutyRoute { pub id: String, pub plan_id: String, pub route_name: String, pub color: String, pub point_ids: Vec<String>, pub route_type: String, pub geometry: Option<Vec<[f64; 2]>>, pub line_style: String }
@@ -499,6 +502,19 @@ pub fn update_duty_point_name(path: &Path, point_id: &str, point_name: &str) -> 
     let updated = connection.execute("UPDATE duty_points SET point_name = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![point_id, point_name]).map_err(|e| format!("無法更新勤務點位名稱：{e}"))?;
     if updated == 0 { return Err("找不到要改名的勤務點位。".to_owned()); }
     Ok(())
+}
+
+pub fn update_duty_point(path: &Path, point_id: &str, input: UpdateDutyPointInput) -> Result<DutyPoint, String> {
+    let point_code = input.point_code.trim();
+    let point_name = input.point_name.trim();
+    if point_code.is_empty() || point_name.is_empty() { return Err("點位編號與名稱不可空白。".to_owned()); }
+    if !["red", "orange", "yellow", "green", "blue", "purple"].contains(&input.color.as_str()) { return Err("不支援的點位顏色。".to_owned()); }
+    if !["duty", "hollow", "signal"].contains(&input.point_type.as_str()) { return Err("不支援的點位類型。".to_owned()); }
+    if !input.latitude.is_finite() || !input.longitude.is_finite() || !(-90.0..=90.0).contains(&input.latitude) || !(-180.0..=180.0).contains(&input.longitude) { return Err("請輸入有效的經緯度。".to_owned()); }
+    let connection = open_database(path)?;
+    let updated = connection.execute("UPDATE duty_points SET point_code = ?2, point_name = ?3, note = ?4, color = ?5, point_type = ?6, latitude = ?7, longitude = ?8, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![point_id, point_code, point_name, input.note.filter(|note| !note.trim().is_empty()), input.color, input.point_type, input.latitude, input.longitude]).map_err(|error| format!("無法更新勤務點位：{error}"))?;
+    if updated == 0 { return Err("找不到要更新的勤務點位。".to_owned()); }
+    connection.query_row("SELECT id, plan_id, point_code, point_name, note, color, point_type, latitude, longitude, visible FROM duty_points WHERE id=?1", [point_id], |r| Ok(DutyPoint { id:r.get(0)?, plan_id:r.get(1)?, point_code:r.get(2)?, point_name:r.get(3)?, note:r.get(4)?, color:r.get(5)?, point_type:r.get(6)?, latitude:r.get(7)?, longitude:r.get(8)?, visible:r.get::<_, i64>(9)? != 0 })).map_err(|error| format!("勤務點位已更新，但無法讀回資料：{error}"))
 }
 
 pub fn list_duty_plans(path: &Path) -> Result<Vec<DutyPlan>, String> {
