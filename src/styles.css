@@ -8,13 +8,18 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .top-bar > strong { font-size: 19px; white-space: nowrap; }
 .app-brand { align-items: center; display: flex; }
 .app-brand img { display: block; height: 31px; width: 31px; }
-.plan-name { color: #9daec3; font-size: 14px; white-space: nowrap; }
+.plan-name { color: #9daec3; flex: 0 0 240px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-status { color: #8fa4ba; flex: 0 1 360px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-actions { display: flex; gap: 8px; }
 .sidebar { align-items: center; display: flex; flex: 1 1 auto; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .sidebar::-webkit-scrollbar { display: none; }
 .nav-item { background: transparent; border-radius: 5px; color: #b4c0d0; flex: 0 0 auto; padding: 7px 10px; text-align: center; white-space: nowrap; }
 .nav-item:hover, .nav-item.active { background: #263d58; color: #fff; }
+@media (min-width: 1101px) {
+  .top-bar { position: relative; }
+  .sidebar { flex: 0 0 auto; left: 50%; position: absolute; transform: translateX(-50%); }
+  .top-actions { margin-left: auto; }
+}
 .workspace { background: #1f2b36; grid-column: 1; grid-row: 2; min-width: 0; padding: 0; position: relative; }
 .map-label-actions { bottom: 14px; left: 14px; position: absolute; z-index: 3; }
 .map-label-actions button, .map-personnel-actions button, .map-point-actions button { background: #fff; border: 1px solid #aeb8c2; box-shadow: 0 1px 4px rgb(0 0 0 / 22%); color: #273544; font-size: 13px; padding: 7px 10px; }
@@ -304,8 +309,7 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .map-label-actions button:hover, .map-personnel-actions button:hover, .map-point-actions button:hover, .map-line-style button:hover { background: #49483e; border-color: #66d9ef; color: #66d9ef; }
 .map-line-style button.active, .map-point-actions button.active { background: #ae81ff; border-color: #ae81ff; color: #1a1a1a; }
 .map-route-legend { background: rgb(39 40 34 / 94%); border-color: #75715e; color: #f8f8f2; }
-.map-point-reminder { background: rgb(249 38 114 / 92%); border-color: #f92672; }
-.map-route-reminder { background: rgb(39 40 34 / 94%); border-color: #66d9ef; }
+.map-point-reminder, .map-route-reminder { background: rgb(249 38 114 / 92%); border-color: #f92672; }
 .point-list-item, .route-list, .route-list-row, .deployment-table-wrap, .assignment-row, .personnel-row, .plan-summary, .confirm-dialog { border-color: #49483e; }
 .point-list-item.selected, .route-point-option.selected, .route-list-row.selected, .deployment-table-wrap tbody tr:hover, .deployment-table-wrap tbody tr.selected { background: #49483e !important; border-color: #ae81ff; }
 .route-point-option { background: #272822; }
@@ -324,7 +328,7 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .map-line-style button.active, .map-point-actions button.active { color: #f8f8f2; }
 .route-list-select, .route-delete-button, .drawing-actions button,
 .save-common-route, .secondary-button { color: #f8f8f2; }
-.inspector .validation-error, .route-name-error { color: #f92672; }
+.inspector .validation-error, .route-name-error, .deployment-route-warning { color: #f92672; }
 
 /* Print preview keeps one opaque copy of each line; the UI note stays readable on white. */
 .preview-mode .deployment-brief p { color: transparent; }
@@ -417,6 +421,21 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
   border-color: #7452b9 !important;
   color: #fff !important;
 }
+.preview-mode .inspector .validation-error,
+.map-output-mode .inspector .validation-error {
+  color: #f92672 !important;
+  margin: 8px 32px;
+  text-align: left;
+}
+.instruction-message { color: #a6e22e !important; }
+.reminder-message { color: #f92672 !important; }
+.personnel-inspector > p { color: #a6e22e !important; }
+.preview-mode .inspector .deployment-route-empty { color: #f92672 !important; }
+.instruction-message, .reminder-message, .personnel-inspector > p,
+.map-point-reminder, .map-route-reminder, .validation-error,
+.route-name-error, .deployment-route-warning, .deployment-route-empty { font-weight: 700; }
+.plan-summary .secondary-button { color: #fff !important; }
+.plan-summary .secondary-button:hover:not(:disabled) { background: #8966d1 !important; color: #fff !important; }
 
 /* The document uses pseudo-content for print-safe fixed text; hide its source text. */
 .a4-preview h2, .deployment-brief p { color: transparent !important; }
