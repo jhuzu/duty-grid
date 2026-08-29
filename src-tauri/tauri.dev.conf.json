@@ -1,0 +1,13 @@
+{
+  "productName": "勤務人力規劃系統（開發版）",
+  "identifier": "tw.gov.newtaipei.dutygrid.development",
+  "app": {
+    "windows": [
+      {
+        "title": "勤務人力規劃系統（開發版）",
+        "titleBarStyle": "Visible",
+        "hiddenTitle": false
+      }
+    ]
+  }
+}

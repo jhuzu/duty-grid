@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" role="img" aria-labelledby="title desc">
+  <title id="title">DutyGrid 主要操作流程</title><desc id="desc">從建立計畫、建立點位和路線，到配置人員、編輯部署表與匯出的操作流程。</desc>
+  <style>text{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;fill:#14213d}.title{font-size:28px;font-weight:700}.h{font-size:20px;font-weight:700}.b{font-size:16px}.s{font-size:14px}.box{stroke:#284b63;stroke-width:2;rx:14}.arrow{stroke:#284b63;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#284b63"/></marker></defs>
+  <rect width="1200" height="660" fill="#f7fbff"/><text x="600" y="48" text-anchor="middle" class="title">主要操作流程</text>
+  <rect x="50" y="115" width="190" height="130" class="box" fill="#dceeff"/><text x="145" y="158" text-anchor="middle" class="h">建立計畫</text><text x="145" y="190" text-anchor="middle" class="b">地圖模式或</text><text x="145" y="216" text-anchor="middle" class="b">自選底圖模式</text>
+  <rect x="290" y="115" width="190" height="130" class="box" fill="#fff0c9"/><text x="385" y="158" text-anchor="middle" class="h">先畫路線</text><text x="385" y="190" text-anchor="middle" class="b">手繪折線</text><text x="385" y="216" text-anchor="middle" class="b">不需先有點位</text>
+  <rect x="530" y="115" width="190" height="130" class="box" fill="#e4f7e8"/><text x="625" y="158" text-anchor="middle" class="h">新增點位</text><text x="625" y="190" text-anchor="middle" class="b">選圖示與顏色</text><text x="625" y="216" text-anchor="middle" class="b">點圖、填名稱</text>
+  <rect x="770" y="115" width="190" height="130" class="box" fill="#f3e6ff"/><text x="865" y="158" text-anchor="middle" class="h">匯入人員</text><text x="865" y="190" text-anchor="middle" class="b">CSV 或 XLSX</text><text x="865" y="216" text-anchor="middle" class="b">檢視拒絕紀錄</text>
+  <rect x="1010" y="115" width="140" height="130" class="box" fill="#ffe6e6"/><text x="1080" y="158" text-anchor="middle" class="h">配置</text><text x="1080" y="190" text-anchor="middle" class="b">選點位</text><text x="1080" y="216" text-anchor="middle" class="b">配置人員</text>
+  <path d="M240 180H280M480 180H520M720 180H760M960 180H1000" class="arrow"/>
+  <rect x="250" y="365" width="300" height="145" class="box" fill="#e6f5f1"/><text x="400" y="408" text-anchor="middle" class="h">編輯部署表</text><text x="400" y="440" text-anchor="middle" class="b">崗哨、單位、無線電、電話</text><text x="400" y="466" text-anchor="middle" class="b">裝備、手動崗哨與人員</text>
+  <rect x="650" y="365" width="300" height="145" class="box" fill="#e6f5f1"/><text x="800" y="408" text-anchor="middle" class="h">輸出與保存</text><text x="800" y="440" text-anchor="middle" class="b">PNG、A4 PDF、Excel</text><text x="800" y="466" text-anchor="middle" class="b">工作區 JSON</text>
+  <path d="M1080 245V300H400V355" class="arrow"/><path d="M550 438H640" class="arrow"/>
+  <text x="600" y="590" text-anchor="middle" class="s">手繪路線不含點位；匯出 Excel 前需選取含點位的路線，且最多可填入 33 列。</text>
+</svg>

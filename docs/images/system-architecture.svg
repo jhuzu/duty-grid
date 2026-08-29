@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 690" role="img" aria-labelledby="title desc">
+  <title id="title">DutyGrid 系統架構</title>
+  <desc id="desc">React 前端經由 Tauri commands 與 Rust 後端、SQLite、本機檔案和外部地圖底圖互動。</desc>
+  <style>text{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;fill:#14213d}.title{font-size:28px;font-weight:700}.h{font-size:20px;font-weight:700}.b{font-size:16px}.s{font-size:14px}.box{stroke:#284b63;stroke-width:2;rx:14}.arrow{stroke:#284b63;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#284b63"/></marker></defs>
+  <rect width="1200" height="690" fill="#f7fbff"/>
+  <text x="600" y="48" text-anchor="middle" class="title">DutyGrid：單一桌面程序架構</text>
+  <rect x="60" y="105" width="300" height="205" class="box" fill="#dceeff"/>
+  <text x="210" y="145" text-anchor="middle" class="h">React 19 前端</text><text x="210" y="178" text-anchor="middle" class="b">App.tsx：畫面、操作與匯出</text><text x="210" y="207" text-anchor="middle" class="b">MapLibre／自選底圖畫布</text><text x="210" y="236" text-anchor="middle" class="b">Tauri API invoke()</text><text x="210" y="277" text-anchor="middle" class="s">Vite 開發伺服器：localhost:1420</text>
+  <rect x="450" y="105" width="300" height="205" class="box" fill="#e4f7e8"/>
+  <text x="600" y="145" text-anchor="middle" class="h">Tauri 2／Rust</text><text x="600" y="178" text-anchor="middle" class="b">lib.rs：commands、檔案、Excel</text><text x="600" y="207" text-anchor="middle" class="b">database.rs：驗證、遷移、CRUD</text><text x="600" y="236" text-anchor="middle" class="b">rusqlite、calamine、ZIP</text><text x="600" y="277" text-anchor="middle" class="s">WebView 內的本機 command 邊界</text>
+  <rect x="840" y="80" width="300" height="110" class="box" fill="#fff0c9"/>
+  <text x="990" y="122" text-anchor="middle" class="h">本機資料</text><text x="990" y="151" text-anchor="middle" class="b">dutygrid.db、custom-basemaps/</text><text x="990" y="176" text-anchor="middle" class="s">app local data 目錄</text>
+  <rect x="840" y="230" width="300" height="110" class="box" fill="#fff0c9"/>
+  <text x="990" y="272" text-anchor="middle" class="h">使用者檔案</text><text x="990" y="301" text-anchor="middle" class="b">CSV/XLSX、底圖、JSON、輸出檔</text><text x="990" y="326" text-anchor="middle" class="s">開啟與儲存對話框</text>
+  <rect x="60" y="430" width="300" height="115" class="box" fill="#f3e6ff"/>
+  <text x="210" y="472" text-anchor="middle" class="h">線上底圖</text><text x="210" y="501" text-anchor="middle" class="b">國土測繪中心 WMTS</text><text x="210" y="526" text-anchor="middle" class="s">失敗時改用 OpenStreetMap</text>
+  <rect x="450" y="430" width="300" height="115" class="box" fill="#f3e6ff"/>
+  <text x="600" y="472" text-anchor="middle" class="h">打包資源</text><text x="600" y="501" text-anchor="middle" class="b">標準化部署表.xlsx</text><text x="600" y="526" text-anchor="middle" class="s">banqiao_roads.db（目前未見讀取）</text>
+  <path d="M360 207H440" class="arrow"/><path d="M750 150H830" class="arrow"/><path d="M750 285H830" class="arrow"/><path d="M210 310V420" class="arrow"/><path d="M600 310V420" class="arrow"/>
+  <text x="400" y="192" text-anchor="middle" class="s">commands</text>
+  <text x="600" y="625" text-anchor="middle" class="s">實線箭頭表示目前程式實際存在的資料或呼叫關係。</text>
+</svg>
