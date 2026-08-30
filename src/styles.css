@@ -92,14 +92,18 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .map-label-actions button, .map-personnel-actions button, .map-point-actions button { background: #fff; border: 1px solid #aeb8c2; box-shadow: 0 1px 4px rgb(0 0 0 / 22%); color: #273544; font-size: 13px; padding: 7px 10px; }
 .map-label-actions button:hover, .map-personnel-actions button:hover, .map-point-actions button:hover { background: #f8fafb; border-color: #7f95aa; color: #0b4779; }
 .map-personnel-actions { bottom: 54px; left: 14px; position: absolute; right: auto; top: auto; z-index: 3; }
-.map-route-controls { bottom: 18px; display: grid; gap: 8px; justify-items: end; position: absolute; right: 14px; z-index: 3; }
-.map-line-style { display: grid; gap: 4px; grid-template-columns: repeat(2, max-content) max-content; grid-template-rows: repeat(2, 1fr); }
+.map-route-controls { bottom: 18px; display: grid; gap: 8px; position: absolute; right: 14px; width: min(370px, calc(100% - 28px)); z-index: 3; }
+.map-line-style { display: grid; gap: 5px; grid-template-columns: repeat(3, 1fr); }
 .map-line-style button { background: #f2f4f6; border: 1px solid #aeb8c2; box-shadow: 0 1px 4px rgb(0 0 0 / 22%); color: #273544; font-size: 13px; padding: 7px 10px; }
 .map-line-style button:hover { background: #fff; border-color: #7f95aa; color: #0b4779; }
 .map-line-style button.active { background: #dfe7ee; border-color: #4f7da8; color: #0b4779; }
 .map-line-style .route-draw-toggle { grid-column: 3; grid-row: 1 / span 2; }
-.map-route-colors { align-items: center; display: flex; gap: 7px; }
+.map-route-colors { align-items: center; display: flex; gap: 7px; justify-content: center; }
 .map-route-colors .color-option { box-shadow: 0 1px 4px rgb(0 0 0 / 30%); }
+.map-route-message { background: #f92672; border: 1px solid #ff79ad; border-radius: 5px; color: #fff; font-size: 13px; font-weight: 700; margin: 0; padding: 9px 11px; }
+.map-route-message.error { background: #d91e62; border-color: #ff8cba; color: #fff; }
+.map-route-entry input { background: #fff; border: 1px solid #b8b8b0; border-radius: 5px; color: #292929; font: inherit; min-width: 0; padding: 9px 11px; width: 100%; }
+.map-route-entry input:focus { border-color: #73736c; outline: 2px solid rgb(115 115 108 / 22%); }
 .map-route-legend { align-items: center; background: rgb(255 255 255 / 93%); border: 1px solid #8695a4; border-radius: 5px; color: #1c2935; display: flex; font-size: 13px; font-weight: 700; gap: 8px; max-width: 250px; padding: 7px 9px; position: absolute; right: 14px; top: 14px; z-index: 3; }
 .map-point-controls { bottom: 18px; display: grid; gap: 8px; justify-items: end; position: absolute; right: 14px; z-index: 3; }
 .map-point-options { align-items: center; display: flex; gap: 7px; }
@@ -115,6 +119,9 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .map-route-reminder { background: rgb(23 32 43 / 95%); border: 1px solid #5aa2dc; border-radius: 5px; color: #fff; font-size: 13px; font-weight: 700; justify-self: stretch; margin: 0; padding: 8px 10px; }
 .route-inspector .color-options, .route-inspector .drawing-actions { display: none; }
 .route-inspector label.field-label:has(+ .color-options) { display: none; }
+.route-inspector .map-route-controls { bottom: auto; margin-top: 18px; position: static; right: auto; width: 100%; }
+.saved-routes-section { border-top: 1px solid #49483e; display: grid; gap: 10px; margin-top: 22px; padding-top: 22px; }
+.saved-routes-section h2 { font-size: 16px; margin: 0; }
 .map-canvas { height: 100%; position: relative; width: 100%; }
 .route-overlay { height: 100%; left: 0; pointer-events: none; position: absolute; top: 0; width: 100%; z-index: 1; }
 .duty-point-dot { background: #f6c453; border: 2px solid #243242; border-radius: 50%; box-shadow: 0 1px 4px rgb(0 0 0 / 55%); cursor: grab; height: 16px; padding: 0; width: 16px; z-index: 2; }
@@ -501,6 +508,8 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .inspector button:hover:not(:disabled), .map-label-actions button:hover,
 .map-personnel-actions button:hover, .map-point-actions button:hover,
 .map-line-style button:hover { background: #f2f2ed; border-color: #fff; color: #111; }
+.map-line-style button.active, .map-point-actions button.active { background: #ae81ff; border-color: #ae81ff; color: #1a1a1a; }
+.route-inspector .map-route-message, .route-inspector .map-route-message.error { color: #fff; }
 .nav-item, .route-list-select, .route-delete-button, .route-point-option,
 .point-list-item { color: #f8f8f2; }
 .nav-item:hover, .nav-item.active, .route-list-row.selected,
