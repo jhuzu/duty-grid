@@ -506,6 +506,10 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .nav-item:hover, .nav-item.active, .route-list-row.selected,
 .point-list-item.selected, .route-point-option.selected { background: #49483e !important; color: #fff; }
 
+.tooltip-trigger { position: relative; }
+.tooltip-trigger::after { background: #1a1a1a; border: 1px solid #75715e; border-radius: 4px; color: #f8f8f2; content: attr(data-tooltip); font-size: 12px; left: 50%; opacity: 0; padding: 5px 8px; pointer-events: none; position: absolute; top: calc(100% + 7px); transform: translate(-50%, -4px); transition: opacity 120ms ease, transform 120ms ease; white-space: nowrap; z-index: 20; }
+.tooltip-trigger:hover::after, .tooltip-trigger:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
 /* Form fields deliberately follow the surface they sit on. */
 .inspector input, .inspector select, .personnel-filters select,
 .route-rename-form input { background: #1a1a1a; border-color: #75715e; color: #fff; }
