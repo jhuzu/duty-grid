@@ -5,7 +5,7 @@ type RouteLine = { color: string; coordinates: [number, number][]; dashed?: bool
 type CanvasSize = { width: number; height: number };
 const colors: Record<string, string> = { red: "#df5050", orange: "#ed9a3a", yellow: "#f6c453", green: "#3faf71", blue: "#2d9cdb", purple: "#8966d1" };
 
-export function CustomBasemapCanvas({ basemapUrl, interactive = true, isDrawingRoute, manualVertices, onCanvasClick, onExportReady, onPointMoved, onPointSelect, pendingCoordinate, personnelLabels, points, routeLines, selectedPointId, showPersonnelLabels }: { basemapUrl: string; interactive?: boolean; isDrawingRoute: boolean; manualVertices: [number, number][]; onCanvasClick: (x: number, y: number) => void; onExportReady: (exporter: () => string | null) => void; onPointMoved: (point: MapDutyPoint, x: number, y: number) => void; onPointSelect: (pointId: string) => void; pendingCoordinate: { x: number; y: number; color: string } | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: RouteLine[]; selectedPointId: string | null; showPersonnelLabels: boolean }) {
+export function CustomBasemapCanvas({ basemapUrl, focusCoordinates, interactive = true, isDrawingRoute, manualVertices, onCanvasClick, onExportReady, onPointMoved, onPointSelect, pendingCoordinate, personnelLabels, points, routeLines, selectedPointId, showPersonnelLabels }: { basemapUrl: string; focusCoordinates?: [number, number][]; interactive?: boolean; isDrawingRoute: boolean; manualVertices: [number, number][]; onCanvasClick: (x: number, y: number) => void; onExportReady: (exporter: () => string | null) => void; onPointMoved: (point: MapDutyPoint, x: number, y: number) => void; onPointSelect: (pointId: string) => void; pendingCoordinate: { x: number; y: number; color: string } | null; personnelLabels: Record<string, string[]>; points: MapDutyPoint[]; routeLines: RouteLine[]; selectedPointId: string | null; showPersonnelLabels: boolean }) {
   const image = useRef<HTMLImageElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const dragged = useRef(false);
@@ -14,6 +14,7 @@ export function CustomBasemapCanvas({ basemapUrl, interactive = true, isDrawingR
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [personnelLabelOffsets, setPersonnelLabelOffsets] = useState<Record<string, { x: number; y: number }>>({});
+  const focusCoordinatesKey = JSON.stringify(focusCoordinates ?? []);
   const pointXY = (point: MapDutyPoint): [number, number] => [point.coordinateX ?? point.longitude, point.coordinateY ?? point.latitude];
   const baseScale = viewportSize.width && viewportSize.height ? Math.min(viewportSize.width / imageSize.width, viewportSize.height / imageSize.height) : 1;
   const baseOffset = { x: (viewportSize.width - imageSize.width * baseScale) / 2, y: (viewportSize.height - imageSize.height * baseScale) / 2 };
@@ -33,6 +34,18 @@ export function CustomBasemapCanvas({ basemapUrl, interactive = true, isDrawingR
     observer.observe(element); return () => observer.disconnect();
   }, []);
   useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, [basemapUrl]);
+  useEffect(() => {
+    if (!focusCoordinates?.length || !viewportSize.width || !viewportSize.height || !baseScale) return;
+    const coordinates = focusCoordinates.filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 1000 && y >= 0 && y <= 1000);
+    if (!coordinates.length) return;
+    const xs = coordinates.map(([x]) => x / 1000 * imageSize.width); const ys = coordinates.map(([, y]) => y / 1000 * imageSize.height);
+    const minX = Math.min(...xs); const maxX = Math.max(...xs); const minY = Math.min(...ys); const maxY = Math.max(...ys);
+    const padding = 96;
+    const nextZoom = coordinates.length === 1 ? Math.min(4, Math.max(1, 1 / baseScale)) : Math.max(0.5, Math.min(4, Math.min((viewportSize.width - padding * 2) / Math.max(maxX - minX, 1) / baseScale, (viewportSize.height - padding * 2) / Math.max(maxY - minY, 1) / baseScale)));
+    const centerX = (minX + maxX) / 2; const centerY = (minY + maxY) / 2;
+    setZoom(nextZoom);
+    setPan({ x: viewportSize.width / 2 - baseOffset.x - centerX * baseScale * nextZoom, y: viewportSize.height / 2 - baseOffset.y - centerY * baseScale * nextZoom });
+  }, [baseOffset.x, baseOffset.y, baseScale, focusCoordinatesKey, imageSize.height, imageSize.width, viewportSize.height, viewportSize.width]);
   useEffect(() => { onExportReady(() => {
     const source = image.current; if (!source?.naturalWidth) return null;
     const canvas = document.createElement("canvas"); canvas.width = source.naturalWidth; canvas.height = source.naturalHeight;
