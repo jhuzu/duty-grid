@@ -343,6 +343,15 @@ pub fn list_personnel(path: &Path) -> Result<Vec<Personnel>, String> {
     rows.collect::<Result<Vec<_>, _>>().map_err(|error| format!("無法讀取人員資料：{error}"))
 }
 
+pub fn clear_personnel(path: &Path) -> Result<(), String> {
+    let mut connection = open_database(path)?;
+    let transaction = connection.transaction().map_err(|error| format!("無法建立清除人力資料交易：{error}"))?;
+    transaction.execute("DELETE FROM personnel_assignments", []).map_err(|error| format!("無法清除人力配置：{error}"))?;
+    transaction.execute("DELETE FROM personnel", []).map_err(|error| format!("無法清除人力資料：{error}"))?;
+    transaction.execute("DELETE FROM import_batches", []).map_err(|error| format!("無法清除人力匯入紀錄：{error}"))?;
+    transaction.commit().map_err(|error| format!("無法完成清除人力資料：{error}"))
+}
+
 pub fn latest_personnel_import_log(path: &Path) -> Result<Option<PersonnelImportLog>, String> {
     let connection = open_database(path)?;
     let batch = connection.query_row("SELECT id, source_file_name, total_rows, accepted_rows, rejected_rows FROM import_batches ORDER BY rowid DESC LIMIT 1", [], |row| Ok((row.get::<_, String>(0)?, PersonnelImportLog { source_file_name: row.get(1)?, total_rows: row.get(2)?, accepted_rows: row.get(3)?, rejected_rows: row.get(4)?, errors: Vec::new() }))).ok();
