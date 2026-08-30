@@ -233,12 +233,15 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .deployment-route-tab.editing input { background: #fff; border: 1px solid #4d7da8; border-radius: 4px; color: #111; font: inherit; max-width: 210px; outline: 0; padding: 5px 7px; width: 190px; }
 .deployment-route-empty { align-self: center; color: #657382; font-size: 13px; }
 .deployment-manual-hint { align-self: center; color: #425466; font-size: 13px; font-weight: 700; margin-left: auto; padding: 0 18px; white-space: nowrap; }
-.deployment-workspace-note { align-items: center; background: #f2f6f9; border-bottom: 1px solid #d5dde5; color: #425466; display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px 18px; line-height: 1.5; margin: 0; padding: 8px 18px; }
-.deployment-workspace-note p { margin: 0; }
-.deployment-inline-import { align-items: center; display: flex; font-size: 11px; gap: 7px; margin-left: auto; }
+.deployment-workspace-note { align-items: center; background: #f2f6f9; border-bottom: 1px solid #d5dde5; color: #425466; display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px 18px; line-height: 1.5; margin: 0; padding: 9px 18px; }
+.deployment-workspace-note p { flex: 1; margin: 0; min-width: 0; }
+.deployment-inline-actions { align-items: center; display: flex; flex: 0 0 auto; gap: 8px; justify-content: end; margin-left: auto; margin-right: 32px; }
+.deployment-inline-import { align-items: center; display: flex; font-size: 11px; gap: 7px; }
 .deployment-inline-import label { align-items: center; display: flex; gap: 6px; white-space: nowrap; }
-.deployment-inline-import select { font: inherit; max-width: 180px; padding: 3px 5px; }
-.deployment-inline-import button { font-size: 11px; margin: 0; padding: 4px 10px; }
+.deployment-inline-import select { font: inherit; height: 30px; max-width: 180px; padding: 3px 5px; }
+.deployment-inline-import button, .manual-deployment-trigger { align-items: center; display: inline-flex; font-size: 11px; height: 30px; justify-content: center; margin: 0; padding: 4px 12px; white-space: nowrap; }
+.manual-deployment-trigger { background: #8966d1; border-color: #7552bc; color: #fff; }
+.manual-deployment-trigger:hover:not(:disabled) { background: #7552bc; color: #fff; }
 .deployment-route-warning { color: #7a4a07; margin: 18px; text-align: center; }
 .a4-preview { background: #fff; color: #111; margin: 0; max-width: none; min-height: 1056px; padding: 38px 42px; width: 100%; }
 .map-output-preview { align-items: center; background: #eef1f4; box-sizing: border-box; display: grid; height: 100%; justify-items: center; min-height: 0; overflow: hidden; padding: 32px; }
@@ -307,8 +310,13 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .manual-deployment { background: #fff; border: 0; color: #111; margin: 0; overflow: hidden; padding: 0; scroll-margin-block: 24px; width: 100%; }
 .deployment-sheet > .manual-deployment { display: none; }
 .manual-deployment:not(.manual-deployment-v2) { display: none; }
-.manual-deployment > div { align-items: center; border: 1px solid #111; border-top: 0; display: flex; justify-content: space-between; margin: 0; padding: 8px 10px; }
-.manual-deployment > div button { background: #fff; border: 1px solid #111; color: #111; margin: 0; }
+.manual-deployment > div { align-items: center; background: #eef3fc; border: 1px solid #8aa2c0; border-top: 3px solid #8966d1; display: flex; gap: 18px; justify-content: space-between; margin: 0; padding: 12px 16px; }
+.manual-deployment > div button { background: #8966d1; border: 1px solid #7552bc; color: #fff; margin: 0; }
+.manual-deployment-heading { align-items: center; display: flex; flex: 1; flex-wrap: nowrap; gap: 10px 18px; min-width: 0; }
+.manual-deployment-heading strong { color: #4d3582; white-space: nowrap; }
+.manual-deployment-heading label { align-items: center; display: flex; flex: 0 0 auto; font-size: 12px; gap: 6px; white-space: nowrap; }
+.manual-deployment-heading select { min-width: 112px; width: 128px; }
+.manual-deployment-heading small { color: #536171; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manual-deployment table { border-collapse: collapse; font: 13px/1.35 "BiauKai", "DFKaiSho-SB", "DFKai-SB", "Kaiti TC", "STKaiti", serif; min-width: 0; table-layout: fixed; width: 100%; }
 .manual-deployment th, .manual-deployment td { border: 1px solid #111; padding: 6px; text-align: center; vertical-align: middle; }
 .manual-deployment select, .manual-deployment input { background: #fff; border: 1px solid #9dacbc; color: #111; font: inherit; max-width: 100%; padding: 4px; width: 100%; }
@@ -546,6 +554,10 @@ button:hover:not(:disabled) { background: #3e3d32; color: #f8f8f2; }
 .delete-button, .manual-deployment .delete-button, .a4-preview .delete-button { background: #df5050 !important; border-color: #b52e2e !important; color: #fff !important; }
 .delete-button:hover:not(:disabled), .manual-deployment .delete-button:hover:not(:disabled),
 .a4-preview .delete-button:hover:not(:disabled) { background: #b52e2e !important; color: #fff !important; }
+.manual-deployment > div > button:not(.delete-button) { background: #8966d1; border-color: #7552bc; color: #fff; }
+.manual-deployment > div > button:not(.delete-button):hover:not(:disabled) { background: #7552bc; color: #fff; }
+.preview-mode .inspector .manual-deployment-trigger, .manual-deployment-trigger { background: #8966d1; border-color: #7552bc; color: #fff; }
+.preview-mode .inspector .manual-deployment-trigger:hover:not(:disabled), .manual-deployment-trigger:hover:not(:disabled) { background: #7552bc; color: #fff; }
 
 /* Inspector lists are dark controls, never transparent document controls. */
 .inspector .point-list-item, .inspector .route-list-select {
