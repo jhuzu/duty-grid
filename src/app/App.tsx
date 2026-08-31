@@ -150,7 +150,7 @@ export default function App() {
   const [isPlacingPoint, setIsPlacingPoint] = useState(false);
   useEffect(() => { if (!manualDeploymentScrollRequest) return; const timer = window.setTimeout(() => manualDeploymentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); return () => window.clearTimeout(timer); }, [manualDeploymentScrollRequest]);
   useEffect(() => { if (!showPlanCreation) return; const timer = window.setTimeout(() => coverPageRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 0); return () => window.clearTimeout(timer); }, [showPlanCreation]);
-  useEffect(() => { if (activeNav === "勤務計畫") setMessage(planId ? "可直接進入「崗哨」配置崗位；如有行進動線需求，再至「路線繪製」繪製。" : "建立計畫後，先匯入勤務簡圖並配置崗位；路線繪製可依需要進行。"); }, [activeNav, planId]);
+  useEffect(() => { if (activeNav === "勤務計畫") setMessage(planId ? "可依勤務需求進行「崗哨」配置與「路線繪製」。" : "建立計畫後，可匯入勤務簡圖、配置崗哨與繪製路線。"); }, [activeNav, planId]);
   const [manualVertices, setManualVertices] = useState<[number, number][]>([]);
   useEffect(() => { void invoke("clear_workspace_states").then(() => invoke<DutyPlanSummary[]>("list_duty_plans")).then((plans) => { setDutyPlans(plans); setMessage("建立新勤務計畫，或從下方開啟既有計畫。"); }).catch((error) => setMessage(`無法初始化勤務計畫：${String(error)}`)); }, []);
   useEffect(() => { if (planId) void invoke<MapDutyPoint[]>("list_duty_points", { planId }).then(setPoints).catch((error) => setMessage(`無法載入勤務點位：${String(error)}`)); }, [planId]);
