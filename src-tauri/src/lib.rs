@@ -46,16 +46,30 @@ fn create_duty_plan(state: State<'_, AppState>, input: CreateDutyPlanInput) -> R
 }
 
 #[tauri::command]
-fn import_custom_basemap(state: State<'_, AppState>, path: String) -> Result<String, String> {
-    let source = PathBuf::from(path);
+fn delete_duty_plan(state: State<'_, AppState>, plan_id: String) -> Result<(), String> {
+    database::delete_duty_plan(&state.database_path, &plan_id)
+}
+
+fn copy_custom_basemap(state: &AppState, source: PathBuf) -> Result<String, String> {
     let extension = source.extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase).ok_or_else(|| "底圖檔案缺少副檔名。".to_owned())?;
-    if !["png", "jpg", "jpeg", "webp"].contains(&extension.as_str()) { return Err("底圖僅支援 PNG、JPG 或 WebP。".to_owned()); }
+    if !["png", "jpg", "jpeg", "webp", "svg"].contains(&extension.as_str()) { return Err("底圖僅支援 PNG、JPG、WebP 或 SVG。".to_owned()); }
     let directory = state.app_data_dir.join("custom-basemaps");
     fs::create_dir_all(&directory).map_err(|error| format!("無法建立底圖資料夾：{error}"))?;
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|error| error.to_string())?.as_millis();
     let destination = directory.join(format!("{stamp}.{extension}"));
     fs::copy(&source, &destination).map_err(|error| format!("無法複製底圖檔案：{error}"))?;
     Ok(destination.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn import_custom_basemap(state: State<'_, AppState>, path: String) -> Result<String, String> {
+    copy_custom_basemap(&state, PathBuf::from(path))
+}
+
+#[tauri::command]
+fn import_guide_white_basemap(state: State<'_, AppState>) -> Result<String, String> {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/guide/white-basemap.svg");
+    copy_custom_basemap(&state, source)
 }
 
 #[tauri::command]
@@ -113,7 +127,7 @@ fn import_personnel_file(state: State<'_, AppState>, path: String) -> Result<Imp
 }
 #[tauri::command]
 fn import_default_personnel_file(state: State<'_, AppState>) -> Result<ImportPersonnelResult, String> {
-    let data_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data");
+    let data_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/seeds");
     let mut files = fs::read_dir(&data_directory).map_err(|error| format!("無法讀取測試資料目錄 {}：{error}", data_directory.display()))?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
@@ -190,7 +204,7 @@ pub fn run() {
             app.manage(database::initialize_state(app_data_dir).map_err(std::io::Error::other)?);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, import_custom_basemap, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, update_duty_point_name, update_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, clear_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, delete_workspace_state, clear_workspace_states, export_deployment_xlsx, save_exported_file, read_workspace_file])
+        .invoke_handler(tauri::generate_handler![app_health, list_duty_plans, create_duty_plan, delete_duty_plan, import_custom_basemap, import_guide_white_basemap, list_duty_points, create_duty_point, delete_duty_point, move_duty_point, update_duty_point_name, update_duty_point, list_duty_routes, create_duty_route, create_manual_route, delete_duty_route, update_duty_route_color, update_duty_route_line_style, update_duty_route_name, list_common_routes, create_common_route, delete_common_route, list_personnel, clear_personnel, list_personnel_assignments, create_personnel_assignment, delete_personnel_assignment, move_personnel_assignment, import_personnel_xlsx, import_personnel_file, import_default_personnel_file, latest_personnel_import_log, list_deployment_equipment, save_deployment_equipment, load_workspace_state, save_workspace_state, delete_workspace_state, clear_workspace_states, export_deployment_xlsx, save_exported_file, read_workspace_file])
         .run(tauri::generate_context!())
         .expect("error while running DutyGrid");
 }

@@ -584,6 +584,14 @@ pub fn create_duty_plan(path: &Path, input: CreateDutyPlanInput) -> Result<DutyP
     ).map_err(|error| format!("勤務計畫已保存，但無法讀回資料：{error}"))
 }
 
+pub fn delete_duty_plan(path: &Path, plan_id: &str) -> Result<(), String> {
+    let connection = open_database(path)?;
+    let deleted = connection.execute("DELETE FROM duty_plans WHERE id = ?1", [plan_id])
+        .map_err(|error| format!("無法刪除勤務計畫：{error}"))?;
+    if deleted == 0 { return Err("找不到要刪除的勤務計畫。".to_owned()); }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
