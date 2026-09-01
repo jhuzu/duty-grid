@@ -45,7 +45,7 @@ pnpm tauri build
 
 - `package.json`：Node 指令與前端相依套件。
 - `vite.config.ts`：React 外掛、連接埠 1420、嚴格連接埠與 Rust 目錄監看排除。
-- `src-tauri/tauri.conf.json`：產品名稱、bundle identifier、視窗尺寸、建置命令、打包資源與 CSP（目前為 `null`）。
+- `src-tauri/tauri.conf.json`：產品名稱、bundle identifier、視窗尺寸、建置命令、打包資源與 CSP。
 - `src-tauri/tauri.dev.conf.json`：開發版名稱、identifier 與視窗標題覆寫。
 - `src-tauri/capabilities/default.json`：預設視窗具備 core 與 dialog 權限。
 

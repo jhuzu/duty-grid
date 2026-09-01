@@ -1,0 +1,38 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { invoke } = vi.hoisted(() => ({
+  invoke: vi.fn(async (command: string) => {
+    if (["list_duty_plans", "list_common_routes", "list_personnel"].includes(command)) return [];
+    if (command === "latest_personnel_import_log") return null;
+    return undefined;
+  }),
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("../features/map/MapCanvas", () => ({ MapCanvas: () => <div>地圖測試替身</div> }));
+vi.mock("../features/map/CustomBasemapCanvas", () => ({ CustomBasemapCanvas: () => <div>底圖測試替身</div> }));
+vi.mock("../features/map/CustomBasemapOutput", () => ({ CustomBasemapOutput: () => <div>輸出測試替身</div> }));
+
+import App from "./App";
+
+describe("勤務建立流程", () => {
+  beforeEach(() => invoke.mockClear());
+
+  it("可從首頁切換至建立勤務表單，並改選地圖模式", async () => {
+    render(<App />);
+    expect(await screen.findByRole("button", { name: "新增勤務" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "新增勤務" }));
+    expect(screen.getByLabelText("勤務計畫名稱")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("勤務計畫名稱"), { target: { value: "測試勤務" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "map" } });
+    expect(screen.queryByText("匯入勤務簡圖")).toBeNull();
+    expect((screen.getByLabelText("勤務計畫名稱") as HTMLInputElement).value).toBe("測試勤務");
+  });
+
+  it("開啟既有工作區時只呼叫 Rust 原生選檔命令", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "開啟資料夾" }));
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("select_workspace_file"));
+  });
+});

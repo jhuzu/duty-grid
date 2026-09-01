@@ -24,6 +24,8 @@ export function MapCanvas({ bearing = 0, dimmedPointIds = [], fitToData = false,
   const isDrawingRouteRef = useRef(isDrawingRoute);
   const hasFallback = useRef(false);
   const fittedZoom = useRef<number | null>(null);
+  const pointById = useRef<globalThis.Map<string, MapDutyPoint>>(new globalThis.Map());
+  const pointMarkers = useRef<globalThis.Map<string, { element: HTMLDivElement; marker: Marker }>>(new globalThis.Map());
   const fitDataKey = JSON.stringify({ points: points.map((point) => [point.id, point.longitude, point.latitude]), routes: routeLines.map((route) => route.coordinates) });
   const focusCoordinatesKey = JSON.stringify(focusCoordinates ?? []);
   const markerDataKey = JSON.stringify({ dimmedPointIds, personnelLabels });
@@ -115,12 +117,42 @@ export function MapCanvas({ bearing = 0, dimmedPointIds = [], fitToData = false,
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => { pointById.current = new globalThis.Map(points.map((point) => [point.id, point])); }, [points]);
   useEffect(() => {
-    if (!map.current) return;
-    if (points.some((point) => !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude) || Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180)) return;
-    const markers = points.map((point) => { const element = document.createElement("div"); let suppressLabelClick = false; element.className = `duty-point-dot ${point.color} ${point.pointType} ${selectedPointId === point.id ? "selected" : ""} ${isDrawingRoute ? "drawing-disabled" : ""} ${showPointLabels ? "show-label" : ""} ${showPersonnelLabels && personnelLabels[point.id]?.length ? "show-personnel-label" : ""}`; element.setAttribute("role", "button"); element.tabIndex = 0; const markerColors: Record<string, string> = { blue: "#2d9cdb", red: "#df5050", orange: "#ed9a3a", yellow: "#f6c453", green: "#3faf71", purple: "#8966d1" }; if (point.pointType === "hollow") { element.style.backgroundColor = "#fff"; element.style.borderColor = "#2d9cdb"; } else if (point.pointType === "signal") { element.style.backgroundColor = "transparent"; element.style.border = "0"; } else { element.style.backgroundColor = markerColors[point.color] ?? "#f6c453"; element.style.borderColor = "#243242"; } element.style.opacity = dimmedPointIds.includes(point.id) ? "0.28" : "1"; element.title = `${point.pointName}（拖曳可移動；雙擊可改名）`; const label = document.createElement("span"); label.className = "duty-point-label"; label.textContent = point.pointCode; label.title = "拖曳可調整標籤位置；雙擊可改名"; label.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); const originX = event.clientX; const originY = event.clientY; const startX = Number.parseFloat(element.style.getPropertyValue("--label-offset-x")) || 0; const startY = Number.parseFloat(element.style.getPropertyValue("--label-offset-y")) || 0; const move = (moveEvent: PointerEvent) => { const offsetX = startX + moveEvent.clientX - originX; const offsetY = startY + originY - moveEvent.clientY; const distance = Math.hypot(offsetX, offsetY); const scale = distance > 64 ? 64 / distance : 1; if (Math.abs(moveEvent.clientX - originX) > 2 || Math.abs(moveEvent.clientY - originY) > 2) suppressLabelClick = true; element.style.setProperty("--label-offset-x", `${offsetX * scale}px`); element.style.setProperty("--label-offset-y", `${offsetY * scale}px`); }; const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.setTimeout(() => { suppressLabelClick = false; }, 0); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); }); label.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); if (!isDrawingRoute) onPointRenameRef.current(point); }); element.append(label); const people = personnelLabels[point.id]; if (people?.length) { const personnelLabel = document.createElement("span"); personnelLabel.className = "duty-personnel-label"; personnelLabel.textContent = people.join("、"); element.append(personnelLabel); } element.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); if (suppressLabelClick) return; if (!isDrawingRoute) { onPointSelect(point.id); element.classList.toggle("show-label"); } }); element.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); if (!isDrawingRoute) onPointRenameRef.current(point); }); element.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPointSelect(point.id); } }); const marker = new Marker({ element, draggable: interactive && !isDrawingRoute }).setLngLat([point.longitude, point.latitude]).addTo(map.current!); marker.on("dragend", () => { const position = marker.getLngLat(); onPointMovedRef.current(point, position.lat, position.lng); }); return marker; });
-    return () => markers.forEach((marker) => marker.remove());
-  }, [interactive, isDrawingRoute, markerDataKey, onPointSelect, personnelLabelPointId, points, selectedPointId, showPersonnelLabels, showPointLabels]);
+    if (!map.current || points.some((point) => !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude) || Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180)) return;
+    const activeMarkers = pointMarkers.current;
+    const activeIds = new Set(points.map((point) => point.id));
+    activeMarkers.forEach(({ marker }, id) => { if (!activeIds.has(id)) { marker.remove(); activeMarkers.delete(id); } });
+    points.forEach((point) => {
+      const existing = activeMarkers.get(point.id);
+      if (existing) { existing.marker.setLngLat([point.longitude, point.latitude]); return; }
+      const element = document.createElement("div"); let suppressLabelClick = false;
+      element.setAttribute("role", "button"); element.tabIndex = 0;
+      const label = document.createElement("span"); label.className = "duty-point-label"; label.title = "拖曳可調整標籤位置；雙擊可改名";
+      label.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); const originX = event.clientX; const originY = event.clientY; const startX = Number.parseFloat(element.style.getPropertyValue("--label-offset-x")) || 0; const startY = Number.parseFloat(element.style.getPropertyValue("--label-offset-y")) || 0; const move = (moveEvent: PointerEvent) => { const offsetX = startX + moveEvent.clientX - originX; const offsetY = startY + moveEvent.clientY - originY; const distance = Math.hypot(offsetX, offsetY); const scale = distance > 64 ? 64 / distance : 1; if (Math.abs(moveEvent.clientX - originX) > 2 || Math.abs(moveEvent.clientY - originY) > 2) suppressLabelClick = true; element.style.setProperty("--label-offset-x", `${offsetX * scale}px`); element.style.setProperty("--label-offset-y", `${offsetY * scale}px`); }; const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.setTimeout(() => { suppressLabelClick = false; }, 0); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); });
+      label.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); const current = pointById.current.get(point.id); if (!isDrawingRouteRef.current && current) onPointRenameRef.current(current); });
+      element.append(label);
+      element.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); if (suppressLabelClick || isDrawingRouteRef.current) return; onPointSelect(point.id); element.classList.toggle("show-label"); });
+      element.addEventListener("dblclick", (event) => { event.preventDefault(); event.stopPropagation(); const current = pointById.current.get(point.id); if (!isDrawingRouteRef.current && current) onPointRenameRef.current(current); });
+      element.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPointSelect(point.id); } });
+      const marker = new Marker({ element, draggable: interactive && !isDrawingRouteRef.current }).setLngLat([point.longitude, point.latitude]).addTo(map.current!);
+      marker.on("dragend", () => { const current = pointById.current.get(point.id); const position = marker.getLngLat(); if (current) onPointMovedRef.current(current, position.lat, position.lng); });
+      activeMarkers.set(point.id, { element, marker });
+    });
+  }, [interactive, onPointSelect, points]);
+  useEffect(() => {
+    const markerColors: Record<string, string> = { blue: "#2d9cdb", red: "#df5050", orange: "#ed9a3a", yellow: "#f6c453", green: "#3faf71", purple: "#8966d1" };
+    pointMarkers.current.forEach(({ element, marker }, id) => {
+      const point = pointById.current.get(id); if (!point) return;
+      element.className = `duty-point-dot ${point.color} ${point.pointType} ${selectedPointId === point.id ? "selected" : ""} ${isDrawingRoute ? "drawing-disabled" : ""} ${showPointLabels ? "show-label" : ""} ${showPersonnelLabels && personnelLabels[point.id]?.length ? "show-personnel-label" : ""}`;
+      element.style.backgroundColor = point.pointType === "hollow" ? "#fff" : point.pointType === "signal" ? "transparent" : markerColors[point.color] ?? "#f6c453";
+      element.style.border = point.pointType === "signal" ? "0" : ""; element.style.borderColor = point.pointType === "hollow" ? "#2d9cdb" : "#243242"; element.style.opacity = dimmedPointIds.includes(point.id) ? "0.28" : "1"; element.title = `${point.pointName}（拖曳可移動；雙擊可改名）`; marker.setDraggable(interactive && !isDrawingRoute);
+      const label = element.querySelector<HTMLSpanElement>(".duty-point-label"); if (label) label.textContent = point.pointCode;
+      const people = personnelLabels[point.id]; let personnelLabel = element.querySelector<HTMLSpanElement>(".duty-personnel-label");
+      if (showPersonnelLabels && people?.length) { if (!personnelLabel) { personnelLabel = document.createElement("span"); personnelLabel.className = "duty-personnel-label"; element.append(personnelLabel); } personnelLabel.textContent = people.join("、"); } else personnelLabel?.remove();
+    });
+  }, [dimmedPointIds, interactive, isDrawingRoute, markerDataKey, points, selectedPointId, showPersonnelLabels, showPointLabels]);
+  useEffect(() => () => { pointMarkers.current.forEach(({ marker }) => marker.remove()); pointMarkers.current.clear(); }, []);
 
   useEffect(() => {
     if (!map.current || !pendingCoordinate) return;
