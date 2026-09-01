@@ -65,7 +65,7 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .plan-name { color: #9daec3; flex: 0 0 240px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-status { color: #8fa4ba; flex: 0 1 360px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-actions { display: flex; flex: 0 0 auto; gap: 8px; }
-.sidebar { align-items: center; border-left: 1px solid #49483e; display: flex; gap: 2px; justify-content: flex-start; min-width: 0; overflow-x: auto; padding-left: 14px; scrollbar-width: none; }
+.sidebar { align-items: center; border-left: 1px solid #49483e; display: flex; gap: 2px; justify-content: flex-start; min-width: 0; overflow-x: auto; padding: 0 14px 0 22px; scrollbar-width: none; }
 .sidebar::-webkit-scrollbar { display: none; }
 .nav-item { background: transparent; border-radius: 5px; color: #b4c0d0; flex: 0 0 auto; padding: 7px 10px; text-align: center; white-space: nowrap; }
 .nav-item:hover, .nav-item.active { background: #263d58; color: #fff; }
@@ -103,7 +103,7 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .map-label-actions button, .map-personnel-actions button, .map-point-actions button { background: #fff; border: 1px solid #aeb8c2; box-shadow: 0 1px 4px rgb(0 0 0 / 22%); color: #273544; font-size: 13px; padding: 7px 10px; }
 .map-label-actions button:hover, .map-personnel-actions button:hover, .map-point-actions button:hover { background: #f8fafb; border-color: #7f95aa; color: #0b4779; }
 .map-personnel-actions { bottom: 54px; left: 14px; position: absolute; right: auto; top: auto; z-index: 3; }
-.map-route-controls { bottom: 18px; display: grid; gap: 8px; position: absolute; right: 14px; width: min(370px, calc(100% - 28px)); z-index: 3; }
+.map-route-controls { bottom: 22px; display: grid; gap: 8px; position: absolute; right: 22px; width: min(370px, calc(100% - 44px)); z-index: 3; }
 .map-line-style { display: grid; gap: 5px; grid-template-columns: repeat(3, 1fr); }
 .map-line-style button { background: #f2f4f6; border: 1px solid #aeb8c2; box-shadow: 0 1px 4px rgb(0 0 0 / 22%); color: #273544; font-size: 13px; padding: 7px 10px; }
 .map-line-style button:hover { background: #fff; border-color: #7f95aa; color: #0b4779; }
@@ -130,7 +130,7 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .map-route-reminder { background: rgb(23 32 43 / 95%); border: 1px solid #5aa2dc; border-radius: 5px; color: #fff; font-size: 13px; font-weight: 700; justify-self: stretch; margin: 0; padding: 8px 10px; }
 .route-inspector .color-options, .route-inspector .drawing-actions { display: none; }
 .route-inspector label.field-label:has(+ .color-options) { display: none; }
-.route-inspector .map-route-controls { bottom: auto; margin-top: 18px; position: static; right: auto; width: 100%; }
+.route-inspector .map-route-controls { bottom: auto; box-sizing: border-box; margin-top: 18px; padding: 8px; position: static; right: auto; width: 100%; }
 .saved-routes-section { border-top: 1px solid #49483e; display: grid; gap: 10px; margin-top: 22px; padding-top: 22px; }
 .saved-routes-section h2 { font-size: 16px; margin: 0; }
 .map-canvas { height: 100%; position: relative; width: 100%; }
@@ -424,10 +424,10 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 .guide-dialog > div { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
 .guide-dialog button { background: #ae81ff; color: #1a1a1a; margin: 0; }
 .guide-dialog .guide-close { background: transparent; border: 1px solid #75715e; color: #deded5; margin-right: auto; }
-.guide-target-active { background-color: #414139 !important; box-shadow: 0 0 0 2px #a6e22e, 0 0 18px rgb(166 226 46 / 58%) !important; color: #fff !important; outline: 1px solid rgb(248 248 242 / 68%); outline-offset: 7px; position: relative; z-index: 41; }
+.guide-target-active { background-color: #414139 !important; box-shadow: 0 0 0 2px #a6e22e, 0 0 18px rgb(166 226 46 / 58%) !important; color: #fff !important; outline: 1px solid rgb(248 248 242 / 68%); outline-offset: 5px; position: relative; z-index: 41; }
 [data-guide="saved-routes"].guide-target-active, [data-guide="saved-points"].guide-target-active { padding: 10px 12px; }
 .guide-nav-locked { cursor: not-allowed; opacity: .42; }
-.guide-callout { background: rgb(48 48 46 / 84%); border: 1px solid #f8f8f2; border-radius: 8px; box-shadow: 0 10px 28px rgb(0 0 0 / 38%); color: #f8f8f2; display: grid; gap: 6px; max-width: calc(100vw - 32px); padding: 16px 18px; pointer-events: none; position: fixed; transform: translateX(-50%); width: 380px; z-index: 42; }
+.guide-callout { background: rgb(48 48 46 / 84%); border: 1px solid #f8f8f2; border-radius: 8px; box-shadow: 0 10px 28px rgb(0 0 0 / 38%); box-sizing: border-box; color: #f8f8f2; display: grid; gap: 6px; max-width: none; padding: 16px 18px; pointer-events: none; position: fixed; transform: translateX(-50%); width: min(380px, calc(100vw - 48px)); z-index: 42; }
 .guide-callout.is-above { transform: translate(-50%, -100%); }
 .guide-callout::before { border-bottom: 10px solid #f8f8f2; border-left: 8px solid transparent; border-right: 8px solid transparent; content: ""; left: 50%; position: absolute; top: -10px; transform: translateX(-50%); }
 .guide-callout.is-above::before { border-bottom: 0; border-top: 10px solid #f8f8f2; bottom: -10px; top: auto; }

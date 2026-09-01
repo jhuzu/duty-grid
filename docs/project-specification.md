@@ -159,7 +159,7 @@ Tauri 2 / Rust command 邊界
 | 效能 | MapLibre 模組延遲載入；路線查詢以 joined query 避免點位 N+1 查詢；marker 以 registry 更新。 |
 | 一致性 | migration、路線建立、種子資料與部分寫入採 transaction；資料庫啟動及 migration 後檢查外鍵。 |
 | 可用性 | 原生對話框與中文錯誤訊息；地圖線上來源失敗時 fallback。 |
-| 測試 | Rust 資料庫與金鑰復原邏輯測試 12 項；Vitest 前端整合測試 3 項；TypeScript、Clippy 與生產建置可驗證。 |
+| 測試 | Rust 資料庫測試 8 項；Vitest 前端整合測試 2 項；TypeScript、Clippy 與生產建置可驗證。 |
 
 ## 7. 開發、建置與驗證
 
@@ -177,7 +177,7 @@ Tauri 2 / Rust command 邊界
 
 - **Apple Silicon：** `勤務人力規劃系統_0.1.0_aarch64.dmg`。
 - **Intel Mac：** `勤務人力規劃系統_0.1.0_x64.dmg`。
-- 兩種架構均已可建置；目前未設定 Apple Developer ID 簽章與 notarization。Beta 試用者可能需依組織端點政策處理 Gatekeeper 提示，對外正式散布前必須補齊簽章與公證。
+- 兩種架構均已可建置，並以 ad-hoc signing 驗證 bundle 完整性；目前未設定 Apple Developer ID 簽章與 notarization。每次 Beta 重建後，Keychain 可能需要重新確認該包的存取權。對外正式散布前必須補齊 Developer ID 簽章與公證。
 
 ## 8. 已知限制與後續建議
 

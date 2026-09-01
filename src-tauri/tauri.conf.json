@@ -30,6 +30,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false
+    },
     "resources": {
       "../標準化部署表.xlsx": "resources/standard_deployment_template.xlsx"
     }

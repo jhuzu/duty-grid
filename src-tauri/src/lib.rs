@@ -24,9 +24,6 @@ const MAX_PERSONNEL_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_WORKSPACE_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_EXPORT_BYTES: usize = 50 * 1024 * 1024;
 
-#[derive(Clone)]
-struct StartupStatus(Result<(), String>);
-
 fn checked_regular_file(
     path: &PathBuf,
     allowed_extensions: &[&str],
@@ -85,11 +82,6 @@ struct SaveGeneratedFileInput {
 #[tauri::command]
 fn app_health() -> &'static str {
     "ok"
-}
-
-#[tauri::command]
-fn startup_status(status: State<'_, StartupStatus>) -> Result<(), String> {
-    status.0.clone()
 }
 
 fn audited<T>(
@@ -745,24 +737,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let initialization = app
-                .path()
-                .app_local_data_dir()
-                .map_err(|error| error.to_string())
-                .and_then(database::initialize_state);
-            let status = match initialization {
-                Ok(state) => {
-                    app.manage(state);
-                    Ok(())
-                }
-                Err(error) => Err(error),
-            };
-            app.manage(StartupStatus(status));
+            let app_data_dir = app.path().app_local_data_dir()?;
+            app.manage(database::initialize_state(app_data_dir).map_err(std::io::Error::other)?);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             app_health,
-            startup_status,
             list_duty_plans,
             create_duty_plan,
             delete_duty_plan,
