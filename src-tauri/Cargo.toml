@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 calamine = "0.26"
 encoding_rs = "0.8"
-keyring = "3"
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 rand = "0.9"
 rusqlite = { version = "0.40", features = ["bundled-sqlcipher-vendored-openssl"] }
 rust_xlsxwriter = "0.90"

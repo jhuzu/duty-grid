@@ -23,6 +23,8 @@ const MAX_IMPORT_ROWS: usize = 20_000;
 const LATEST_MIGRATION_VERSION: i64 = 18;
 #[cfg(not(test))]
 const DATABASE_KEYRING_SERVICE: &str = "tw.gov.dutygrid.database";
+#[cfg(not(test))]
+const LEGACY_DATABASE_KEYRING_ACCOUNT: &str = "dutygrid.db.v1";
 
 fn supported_color(color: &str) -> bool {
     ["red", "orange", "yellow", "green", "blue", "purple"].contains(&color)
@@ -152,6 +154,16 @@ fn database_key(_path: &Path) -> Result<String, String> {
     Ok("4f1d9e31b9ca2a6f0c5d81a466f9ca75f1528e9ef8d3b8c17a2e945c13bfe68d".to_owned())
 }
 
+#[cfg(test)]
+fn legacy_database_key() -> Result<Option<String>, String> {
+    Ok(None)
+}
+
+#[cfg(test)]
+fn store_database_key(_path: &Path, _key: &str) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(not(test))]
 fn database_key(path: &Path) -> Result<String, String> {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -173,6 +185,30 @@ fn database_key(path: &Path) -> Result<String, String> {
         }
         Err(error) => Err(format!("無法讀取作業系統金鑰儲存區中的資料庫金鑰：{error}")),
     }
+}
+
+#[cfg(not(test))]
+fn legacy_database_key() -> Result<Option<String>, String> {
+    let entry = Entry::new(DATABASE_KEYRING_SERVICE, LEGACY_DATABASE_KEYRING_ACCOUNT)
+        .map_err(|error| format!("無法使用作業系統金鑰儲存區：{error}"))?;
+    match entry.get_password() {
+        Ok(key) if valid_database_key(&key) => Ok(Some(key)),
+        Ok(_) => Err("舊版資料庫金鑰格式無效。".to_owned()),
+        Err(KeyringError::NoEntry) => Ok(None),
+        Err(error) => Err(format!("無法讀取舊版資料庫金鑰：{error}")),
+    }
+}
+
+#[cfg(not(test))]
+fn store_database_key(path: &Path, key: &str) -> Result<(), String> {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    path.to_string_lossy().hash(&mut hasher);
+    let account = format!("dutygrid.db.v1.{:016x}", hasher.finish());
+    let entry = Entry::new(DATABASE_KEYRING_SERVICE, &account)
+        .map_err(|error| format!("無法使用作業系統金鑰儲存區：{error}"))?;
+    entry
+        .set_password(key)
+        .map_err(|error| format!("無法更新資料庫金鑰參照：{error}"))
 }
 
 #[derive(Serialize)]
@@ -403,7 +439,19 @@ pub fn initialize_state(app_data_dir: PathBuf) -> Result<AppState, String> {
     let database_path = app_data_dir.join("dutygrid.db");
     let key = database_key(&database_path)?;
     if database_path.exists() && !is_encrypted_database(&database_path, &key) {
-        migrate_plaintext_database(&database_path, &key)?;
+        if let Some(legacy_key) = legacy_database_key()? {
+            if is_encrypted_database(&database_path, &legacy_key) {
+                store_database_key(&database_path, &legacy_key)?;
+            } else if is_plaintext_database(&database_path)? {
+                migrate_plaintext_database(&database_path, &key)?;
+            } else {
+                return Err("無法以目前或舊版作業系統金鑰儲存區中的金鑰開啟加密資料庫。資料庫可能屬於其他 OS 帳號，或金鑰已遺失。".to_owned());
+            }
+        } else if is_plaintext_database(&database_path)? {
+            migrate_plaintext_database(&database_path, &key)?;
+        } else {
+            return Err("無法以作業系統金鑰儲存區中的金鑰開啟加密資料庫。資料庫可能屬於其他 OS 帳號，或金鑰已遺失。".to_owned());
+        }
     }
     if database_path.exists()
         && recorded_migration_version(&database_path) < LATEST_MIGRATION_VERSION
@@ -416,6 +464,11 @@ pub fn initialize_state(app_data_dir: PathBuf) -> Result<AppState, String> {
         database_path,
         app_data_dir,
     })
+}
+
+fn is_plaintext_database(path: &Path) -> Result<bool, String> {
+    let bytes = fs::read(path).map_err(|error| format!("無法讀取既有資料庫：{error}"))?;
+    Ok(bytes.starts_with(b"SQLite format 3\0"))
 }
 
 #[cfg(unix)]

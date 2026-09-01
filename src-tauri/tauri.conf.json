@@ -31,7 +31,6 @@
     "active": true,
     "targets": "all",
     "resources": {
-      "../data/reference/banqiao_roads.db": "resources/banqiao_roads.db",
       "../標準化部署表.xlsx": "resources/standard_deployment_template.xlsx"
     }
   }

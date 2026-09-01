@@ -16,7 +16,7 @@
   <rect x="60" y="430" width="300" height="115" class="box" fill="#f3e6ff"/>
   <text x="210" y="472" text-anchor="middle" class="h">線上底圖</text><text x="210" y="501" text-anchor="middle" class="b">國土測繪中心 WMTS</text><text x="210" y="526" text-anchor="middle" class="s">失敗時改用 OpenStreetMap</text>
   <rect x="450" y="430" width="300" height="115" class="box" fill="#f3e6ff"/>
-  <text x="600" y="472" text-anchor="middle" class="h">打包資源</text><text x="600" y="501" text-anchor="middle" class="b">標準化部署表.xlsx</text><text x="600" y="526" text-anchor="middle" class="s">banqiao_roads.db（目前未見讀取）</text>
+  <text x="600" y="472" text-anchor="middle" class="h">打包資源</text><text x="600" y="501" text-anchor="middle" class="b">標準化部署表.xlsx</text>
   <path d="M360 207H440" class="arrow"/><path d="M750 150H830" class="arrow"/><path d="M750 285H830" class="arrow"/><path d="M210 310V420" class="arrow"/><path d="M600 310V420" class="arrow"/>
   <text x="400" y="192" text-anchor="middle" class="s">commands</text>
   <text x="600" y="625" text-anchor="middle" class="s">實線箭頭表示目前程式實際存在的資料或呼叫關係。</text>

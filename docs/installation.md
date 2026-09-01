@@ -31,7 +31,7 @@ Tauri 設定在建置前執行 `pnpm build`，前端產物位於 `dist/`。可�
 pnpm tauri build
 ```
 
-設定會將 `data/reference/banqiao_roads.db` 與 `標準化部署表.xlsx` 打包為資源。不過目前 Rust 程式只在匯出 Excel 時實際讀取 Excel 範本；未找到讀取 `banqiao_roads.db` 的程式碼，因此該資料庫目前對執行功能的用途為**待確認**。
+設定會將 `標準化部署表.xlsx` 打包為資源，Rust 程式在匯出 Excel 時會讀取該範本。
 
 ## 關閉
 
