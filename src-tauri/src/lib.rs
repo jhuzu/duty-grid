@@ -128,15 +128,15 @@ fn import_personnel_file(state: State<'_, AppState>, path: String) -> Result<Imp
 #[tauri::command]
 fn import_default_personnel_file(state: State<'_, AppState>) -> Result<ImportPersonnelResult, String> {
     let data_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/seeds");
-    let mut files = fs::read_dir(&data_directory).map_err(|error| format!("無法讀取測試資料目錄 {}：{error}", data_directory.display()))?
+    let mut files = fs::read_dir(&data_directory).map_err(|error| format!("無法讀取範例資料目錄 {}：{error}", data_directory.display()))?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| path.is_file() && matches!(path.extension().and_then(|extension| extension.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("xlsx") | Some("csv")))
         .collect::<Vec<_>>();
     files.sort_by_key(|path| (if path.extension().and_then(|extension| extension.to_str()).is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx")) { 0 } else { 1 }, path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default()));
-    let path = files.into_iter().next().ok_or_else(|| format!("找不到測試人力資料。請將 .xlsx 或 .csv 放到 {}；會優先讀取 .xlsx。", data_directory.display()))?;
+    let path = files.into_iter().next().ok_or_else(|| format!("找不到範例人力資料。請將 .xlsx 或 .csv 放到 {}；會優先讀取 .xlsx。", data_directory.display()))?;
     let file_name = path.file_name().and_then(|name| name.to_str()).ok_or_else(|| "無法取得測試資料檔名。".to_owned())?.to_owned();
-    let file_data = fs::read(&path).map_err(|error| format!("無法讀取測試人力資料檔：{error}"))?;
+    let file_data = fs::read(&path).map_err(|error| format!("無法讀取範例人力資料檔：{error}"))?;
     database::import_personnel_xlsx(&state.database_path, ImportPersonnelInput { file_name, file_data })
 }
 #[tauri::command]
