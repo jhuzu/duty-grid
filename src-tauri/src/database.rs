@@ -1,10 +1,17 @@
 use std::fs;
+#[cfg(not(test))]
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use calamine::{Reader, Xlsx};
 use encoding_rs::BIG5;
+#[cfg(not(test))]
+use keyring::{Entry, Error as KeyringError};
+#[cfg(not(test))]
+use rand::RngCore;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
@@ -14,6 +21,8 @@ const MAX_TEXT_LENGTH: usize = 500;
 const MAX_IMPORT_BYTES: usize = 10 * 1024 * 1024;
 const MAX_IMPORT_ROWS: usize = 20_000;
 const LATEST_MIGRATION_VERSION: i64 = 18;
+#[cfg(not(test))]
+const DATABASE_KEYRING_SERVICE: &str = "tw.gov.dutygrid.database";
 
 fn supported_color(color: &str) -> bool {
     ["red", "orange", "yellow", "green", "blue", "purple"].contains(&color)
@@ -93,6 +102,77 @@ fn point_belongs_to_plan(
 pub struct AppState {
     pub database_path: PathBuf,
     pub app_data_dir: PathBuf,
+}
+
+/// Records metadata only. Callers must never put names, phone numbers, SQL, or file paths in fields.
+pub fn append_audit_log(
+    app_data_dir: &Path,
+    operation: &str,
+    resource: &str,
+    record_count: usize,
+    success: bool,
+) -> Result<(), String> {
+    let audit_dir = app_data_dir.join("logs");
+    fs::create_dir_all(&audit_dir).map_err(|error| format!("無法建立稽核紀錄目錄：{error}"))?;
+    restrict_owner_permissions(&audit_dir, true)?;
+    let day = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("無法建立稽核時間：{error}"))?
+        .as_secs()
+        / 86_400;
+    let path = audit_dir.join(format!("audit-{day}.log"));
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("無法建立稽核時間：{error}"))?
+        .as_secs();
+    let line = format!(
+        "{{\"timestamp\":{timestamp},\"operation\":\"{operation}\",\"resource\":\"{resource}\",\"recordCount\":{record_count},\"success\":{success}}}\n"
+    );
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|error| format!("無法開啟稽核紀錄：{error}"))?;
+    restrict_owner_permissions(&path, false)?;
+    file.write_all(line.as_bytes())
+        .map_err(|error| format!("無法寫入稽核紀錄：{error}"))
+}
+
+#[cfg(not(test))]
+fn key_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn valid_database_key(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+#[cfg(test)]
+fn database_key(_path: &Path) -> Result<String, String> {
+    Ok("4f1d9e31b9ca2a6f0c5d81a466f9ca75f1528e9ef8d3b8c17a2e945c13bfe68d".to_owned())
+}
+
+#[cfg(not(test))]
+fn database_key(path: &Path) -> Result<String, String> {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    path.to_string_lossy().hash(&mut hasher);
+    let account = format!("dutygrid.db.v1.{:016x}", hasher.finish());
+    let entry = Entry::new(DATABASE_KEYRING_SERVICE, &account)
+        .map_err(|error| format!("無法使用作業系統金鑰儲存區：{error}"))?;
+    match entry.get_password() {
+        Ok(key) if valid_database_key(&key) => Ok(key),
+        Ok(_) => Err("作業系統金鑰儲存區中的 DutyGrid 資料庫金鑰格式無效。".to_owned()),
+        Err(KeyringError::NoEntry) => {
+            let mut bytes = [0u8; 32];
+            rand::rng().fill_bytes(&mut bytes);
+            let key = key_hex(&bytes);
+            entry
+                .set_password(&key)
+                .map_err(|error| format!("無法將資料庫金鑰儲存至作業系統金鑰儲存區：{error}"))?;
+            Ok(key)
+        }
+        Err(error) => Err(format!("無法讀取作業系統金鑰儲存區中的資料庫金鑰：{error}")),
+    }
 }
 
 #[derive(Serialize)]
@@ -321,6 +401,10 @@ pub fn initialize_state(app_data_dir: PathBuf) -> Result<AppState, String> {
         .map_err(|error| format!("無法建立應用程式資料目錄：{error}"))?;
     restrict_owner_permissions(&app_data_dir, true)?;
     let database_path = app_data_dir.join("dutygrid.db");
+    let key = database_key(&database_path)?;
+    if database_path.exists() && !is_encrypted_database(&database_path, &key) {
+        migrate_plaintext_database(&database_path, &key)?;
+    }
     if database_path.exists()
         && recorded_migration_version(&database_path) < LATEST_MIGRATION_VERSION
     {
@@ -350,7 +434,7 @@ fn restrict_owner_permissions(_path: &Path, _directory: bool) -> Result<(), Stri
 }
 
 fn recorded_migration_version(path: &Path) -> i64 {
-    let Ok(connection) = Connection::open(path) else {
+    let Ok(connection) = open_database(path) else {
         return 0;
     };
     connection
@@ -381,12 +465,56 @@ fn backup_before_migration(path: &Path) -> Result<PathBuf, String> {
 }
 
 fn open_database(path: &Path) -> Result<Connection, String> {
+    let key = database_key(path)?;
+    open_encrypted_database(path, &key)
+}
+
+fn open_encrypted_database(path: &Path, key: &str) -> Result<Connection, String> {
+    if !valid_database_key(key) {
+        return Err("資料庫金鑰格式無效。".to_owned());
+    }
     let connection =
         Connection::open(path).map_err(|error| format!("無法開啟本機資料庫：{error}"))?;
     connection
-        .execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")
+        .execute_batch(&format!(
+            "PRAGMA key = \"x'{key}'\"; PRAGMA cipher_memory_security = ON; PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;"
+        ))
         .map_err(|error| format!("無法設定本機資料庫：{error}"))?;
+    connection
+        .query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .map_err(|_| {
+            "無法以作業系統金鑰儲存區中的金鑰開啟資料庫。資料庫可能屬於其他 OS 帳號或金鑰已遺失。"
+                .to_owned()
+        })?;
     Ok(connection)
+}
+
+fn is_encrypted_database(path: &Path, key: &str) -> bool {
+    open_encrypted_database(path, key).is_ok()
+}
+
+fn migrate_plaintext_database(path: &Path, key: &str) -> Result<(), String> {
+    let temporary = path.with_file_name("dutygrid.encrypting.db");
+    if temporary.exists() {
+        fs::remove_file(&temporary)
+            .map_err(|error| format!("無法清除未完成的加密遷移檔案：{error}"))?;
+    }
+    let source =
+        Connection::open(path).map_err(|error| format!("無法開啟既有明文資料庫：{error}"))?;
+    source
+        .execute_batch("PRAGMA journal_mode = DELETE;")
+        .map_err(|error| format!("無法整理既有明文資料庫 journal：{error}"))?;
+    let temporary_name = temporary.to_string_lossy().replace('\'', "''");
+    source.execute_batch(&format!(
+        "ATTACH DATABASE '{temporary_name}' AS encrypted KEY \"x'{key}'\"; SELECT sqlcipher_export('encrypted'); DETACH DATABASE encrypted;"
+    )).map_err(|error| format!("無法建立加密資料庫副本：{error}"))?;
+    drop(source);
+    open_encrypted_database(&temporary, key)?;
+    fs::rename(&temporary, path)
+        .map_err(|error| format!("無法以加密資料庫取代既有資料庫：{error}"))?;
+    Ok(())
 }
 
 fn migration_done(connection: &Connection, version: i64) -> Result<bool, String> {
@@ -1742,6 +1870,53 @@ mod tests {
             })
             .count();
         assert_eq!(backups, 1);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn upgrades_plaintext_database_to_sqlcipher_and_writes_metadata_only_audit_log() {
+        let directory =
+            std::env::temp_dir().join(format!("dutygrid-encryption-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).expect("test directory should be created");
+        let database_path = directory.join("dutygrid.db");
+        let plaintext = Connection::open(&database_path).expect("plaintext database should open");
+        plaintext
+            .execute_batch(
+                "CREATE TABLE source_data(value TEXT); INSERT INTO source_data VALUES ('secret');",
+            )
+            .expect("plaintext data should be written");
+        drop(plaintext);
+
+        initialize_state(directory.clone()).expect("plaintext database should be encrypted");
+        assert!(Connection::open(&database_path)
+            .and_then(|connection| connection.query_row(
+                "SELECT value FROM source_data",
+                [],
+                |row| row.get::<_, String>(0)
+            ))
+            .is_err());
+        let encrypted = open_database(&database_path).expect("encrypted database should open");
+        let value: String = encrypted
+            .query_row("SELECT value FROM source_data", [], |row| row.get(0))
+            .expect("encrypted data should remain available");
+        assert_eq!(value, "secret");
+
+        append_audit_log(&directory, "read", "personnel", 1, true)
+            .expect("audit should be written");
+        let audit = std::fs::read_to_string(
+            directory
+                .join("logs")
+                .read_dir()
+                .expect("audit directory should exist")
+                .next()
+                .expect("audit file should exist")
+                .expect("audit entry should be readable")
+                .path(),
+        )
+        .expect("audit log should be readable");
+        assert!(audit.contains("\"operation\":\"read\""));
+        assert!(!audit.contains("secret"));
         let _ = std::fs::remove_dir_all(directory);
     }
 

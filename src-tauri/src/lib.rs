@@ -84,6 +84,17 @@ fn app_health() -> &'static str {
     "ok"
 }
 
+fn audited<T>(
+    state: &AppState,
+    operation: &str,
+    resource: &str,
+    result: Result<T, String>,
+) -> Result<T, String> {
+    let success = result.is_ok();
+    database::append_audit_log(&state.app_data_dir, operation, resource, 1, success)?;
+    result
+}
+
 #[tauri::command]
 fn list_duty_plans(state: State<'_, AppState>) -> Result<Vec<DutyPlan>, String> {
     database::list_duty_plans(&state.database_path)
@@ -265,11 +276,21 @@ fn delete_common_route(state: State<'_, AppState>, route_id: String) -> Result<(
 }
 #[tauri::command]
 fn list_personnel(state: State<'_, AppState>) -> Result<Vec<Personnel>, String> {
-    database::list_personnel(&state.database_path)
+    audited(
+        &state,
+        "read",
+        "personnel",
+        database::list_personnel(&state.database_path),
+    )
 }
 #[tauri::command]
 fn clear_personnel(state: State<'_, AppState>) -> Result<(), String> {
-    database::clear_personnel(&state.database_path)
+    audited(
+        &state,
+        "delete",
+        "personnel",
+        database::clear_personnel(&state.database_path),
+    )
 }
 #[tauri::command]
 fn list_personnel_assignments(
@@ -283,14 +304,24 @@ fn create_personnel_assignment(
     state: State<'_, AppState>,
     input: CreatePersonnelAssignmentInput,
 ) -> Result<PersonnelAssignment, String> {
-    database::create_personnel_assignment(&state.database_path, input)
+    audited(
+        &state,
+        "create",
+        "personnel_assignment",
+        database::create_personnel_assignment(&state.database_path, input),
+    )
 }
 #[tauri::command]
 fn delete_personnel_assignment(
     state: State<'_, AppState>,
     assignment_id: String,
 ) -> Result<(), String> {
-    database::delete_personnel_assignment(&state.database_path, &assignment_id)
+    audited(
+        &state,
+        "delete",
+        "personnel_assignment",
+        database::delete_personnel_assignment(&state.database_path, &assignment_id),
+    )
 }
 #[tauri::command]
 fn move_personnel_assignment(
@@ -298,14 +329,24 @@ fn move_personnel_assignment(
     assignment_id: String,
     duty_point_id: String,
 ) -> Result<(), String> {
-    database::move_personnel_assignment(&state.database_path, &assignment_id, duty_point_id)
+    audited(
+        &state,
+        "update",
+        "personnel_assignment",
+        database::move_personnel_assignment(&state.database_path, &assignment_id, duty_point_id),
+    )
 }
 #[tauri::command]
 fn import_personnel_xlsx(
     state: State<'_, AppState>,
     input: ImportPersonnelInput,
 ) -> Result<ImportPersonnelResult, String> {
-    database::import_personnel_xlsx(&state.database_path, input)
+    audited(
+        &state,
+        "import",
+        "personnel",
+        database::import_personnel_xlsx(&state.database_path, input),
+    )
 }
 fn import_personnel_from_path(
     database_path: &std::path::Path,
@@ -350,7 +391,13 @@ async fn select_personnel_file(
     let path = selected
         .into_path()
         .map_err(|error| format!("無法讀取人力資料路徑：{error}"))?;
-    import_personnel_from_path(&state.database_path, path).map(Some)
+    audited(
+        &state,
+        "import",
+        "personnel",
+        import_personnel_from_path(&state.database_path, path),
+    )
+    .map(Some)
 }
 #[tauri::command]
 fn import_default_personnel_file(
@@ -608,6 +655,7 @@ fn validated_export_name(input: &SaveGeneratedFileInput) -> Result<(String, Stri
 
 #[tauri::command]
 async fn save_generated_file(
+    state: State<'_, AppState>,
     app: tauri::AppHandle,
     input: SaveGeneratedFileInput,
 ) -> Result<bool, String> {
@@ -637,7 +685,8 @@ async fn save_generated_file(
     {
         return Err("選擇的檔案副檔名與匯出格式不一致。".to_owned());
     }
-    fs::write(path, input.bytes).map_err(|error| format!("無法儲存匯出檔案：{error}"))?;
+    let result = fs::write(path, input.bytes).map_err(|error| format!("無法儲存匯出檔案：{error}"));
+    audited(&state, "export", "generated_file", result)?;
     Ok(true)
 }
 #[tauri::command]

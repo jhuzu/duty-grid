@@ -8,7 +8,7 @@
 
 ## 架構摘要
 
-DutyGrid 是單一桌面程序：React 19 前端在 Tauri WebView 中執行，透過 `@tauri-apps/api` 的 `invoke()` 呼叫 Rust 指令。Rust 使用 `rusqlite` 開啟本機 `dutygrid.db`、首次使用時執行遷移與人員種子資料建立。沒有 HTTP API、後端常駐服務或遠端資料庫。
+DutyGrid 是單一桌面程序：React 19 前端在 Tauri WebView 中執行，透過 `@tauri-apps/api` 的 `invoke()` 呼叫 Rust 指令。Rust 使用 `rusqlite` 與 SQLCipher 開啟本機加密的 `dutygrid.db`，資料庫金鑰由作業系統憑證儲存區管理；首次使用時執行遷移與人員種子資料建立。沒有 HTTP API、後端常駐服務或遠端資料庫。詳見 [資料保護與稽核](security.md)。
 
 地圖模式由 MapLibre GL 顯示國土測繪中心 WMTS；MapLibre 的 `error` 事件會將 style 改為 OpenStreetMap fallback。自選底圖模式完全由選取圖片與前端 Canvas/SVG 繪製。匯出 Excel 時 Rust 直接修改打包的標準部署表 ZIP/XML；PNG/PDF 地圖由前端 Canvas 產生。
 
