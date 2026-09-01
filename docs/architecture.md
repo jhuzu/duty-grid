@@ -24,7 +24,7 @@ DutyGrid 是單一桌面程序：React 19 前端在 Tauri WebView 中執行，�
 | `src/styles.css` | 全部畫面與地圖覆蓋層樣式。 |
 | `src-tauri/src/lib.rs` | Tauri command 邊界、檔案 I/O、底圖複製、Excel 範本填寫與程式啟動。 |
 | `src-tauri/src/database.rs` | SQLite schema migration、資料模型、CRUD、人員 CSV/XLSX 匯入與 Rust 測試。 |
-| `src-tauri/migrations/` | 0001–0017 的增量 schema 變更。 |
+| `src-tauri/migrations/` | 0001–0018 的增量 schema 變更。 |
 | `data/seeds/personnel-sample.csv` | 初次建立資料庫時匯入的 56 筆種子人員。 |
 | `標準化部署表.xlsx` | Excel 匯出的格式範本。 |
 
@@ -50,11 +50,11 @@ DutyGrid 是單一桌面程序：React 19 前端在 Tauri WebView 中執行，�
 
 前端僅透過 Tauri command 與 Rust 溝通。主要群組為：
 
-- 計畫與底圖：`list_duty_plans`、`create_duty_plan`、`import_custom_basemap`。
+- 計畫與底圖：`list_duty_plans`、`create_duty_plan`、`select_custom_basemap`、`read_managed_basemap`。
 - 點位與路線：`list/create/update/delete/move_duty_point`、`list/create/delete/update_duty_route`、`create_manual_route`、常用路線命令。
-- 人員：`list_personnel`、`import_personnel_file`、`import_default_personnel_file`、配置 CRUD 與最新匯入紀錄。
-- 部署與工作區：裝備讀寫、工作區暫存讀寫/清除、任意工作區檔讀寫。
-- 匯出：`export_deployment_xlsx` 產生 bytes，`save_exported_file` 寫到使用者選定路徑。
+- 人員：`list_personnel`、`select_personnel_file`、`import_default_personnel_file`、配置 CRUD 與最新匯入紀錄。
+- 部署與工作區：裝備讀寫、工作區暫存讀寫/清除、`select_workspace_file` 讀取工作區檔案。
+- 匯出：`export_deployment_xlsx` 產生 bytes，`save_generated_file` 由 Rust 開啟原生儲存對話框後寫入。
 
 `app_health` 與 `import_personnel_xlsx` 也有註冊 command，但前端沒有呼叫前者或直接呼叫後者。
 
@@ -73,4 +73,4 @@ Rust command 回傳 `Result<…, String>`，前端多以 `try/catch` 或 Promise
 3. 變更 Excel 欄位前，確認 `export_deployment_xlsx()` 中的儲存格範圍與 style index；目前假設 sheet1 與 A7:I39 存在。
 4. 人員欄位或匯入規則變動時，新增 CSV/XLSX 正反案例測試。
 5. 修改 MapLibre 或輸出功能後，以實際網路可用與不可用兩種狀態檢查，並確認自選底圖與地圖模式都能輸出。
-6. `tauri.conf.json` 的 CSP 為 `null`；若要強化安全性，應先盤點線上圖磚、WebView 和匯出所需來源，再設定明確 CSP（安全策略內容為**待確認**）。
+6. 變更 `tauri.conf.json` CSP 時，保留 Tauri IPC、本機資產與必要圖磚來源；新增外部來源前須重新進行最小權限盤點。

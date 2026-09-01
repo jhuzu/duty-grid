@@ -57,6 +57,7 @@ button:not(:disabled):active { transform: translateY(1px); transition-duration: 
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 .app-shell { display: grid; grid-template-columns: minmax(480px, 1fr) 330px; grid-template-rows: 58px minmax(0, 1fr) 28px; height: 100vh; min-height: 0; overflow: hidden; }
 .top-bar { align-items: center; background: #272822; border-bottom: 1px solid #49483e; display: grid; gap: 14px; grid-column: 1 / -1; grid-row: 1; grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto); min-height: 58px; min-width: 0; padding: 0 20px; position: relative; z-index: 10; }
+.macos-titlebar-overlay .top-bar { padding-left: 112px; }
 .top-bar > strong { font-size: 19px; white-space: nowrap; }
 .top-identity { align-items: center; display: flex; gap: 10px; min-width: 0; }
 .app-brand { align-items: center; display: flex; flex: 0 0 auto; }

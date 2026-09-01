@@ -22,6 +22,8 @@ const MAX_IMPORT_BYTES: usize = 10 * 1024 * 1024;
 const MAX_IMPORT_ROWS: usize = 20_000;
 const LATEST_MIGRATION_VERSION: i64 = 18;
 #[cfg(not(test))]
+const DATABASE_KEY_ID_FILE: &str = "dutygrid.key-id";
+#[cfg(not(test))]
 const DATABASE_KEYRING_SERVICE: &str = "tw.gov.dutygrid.database";
 #[cfg(not(test))]
 const LEGACY_DATABASE_KEYRING_ACCOUNT: &str = "dutygrid.db.v1";
@@ -149,6 +151,73 @@ fn valid_database_key(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+#[cfg(not(test))]
+fn database_key_id(path: &Path) -> Result<String, String> {
+    let directory = path
+        .parent()
+        .ok_or_else(|| "無法判定資料庫資料目錄。".to_owned())?;
+    let id_path = directory.join(DATABASE_KEY_ID_FILE);
+    match fs::read_to_string(&id_path) {
+        Ok(id)
+            if id.trim().len() == 32 && id.trim().bytes().all(|byte| byte.is_ascii_hexdigit()) =>
+        {
+            Ok(id.trim().to_owned())
+        }
+        Ok(_) => Err("資料庫金鑰識別碼格式無效。".to_owned()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let mut bytes = [0u8; 16];
+            rand::rng().fill_bytes(&mut bytes);
+            let id = key_hex(&bytes);
+            fs::write(&id_path, &id)
+                .map_err(|error| format!("無法建立資料庫金鑰識別碼：{error}"))?;
+            restrict_owner_permissions(&id_path, false)?;
+            Ok(id)
+        }
+        Err(error) => Err(format!("無法讀取資料庫金鑰識別碼：{error}")),
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum DatabaseRecovery {
+    CurrentKey,
+    AdoptLegacyKey(String),
+    EncryptPlaintext,
+}
+
+fn choose_database_recovery(
+    current_key_opens_database: bool,
+    legacy_key: Option<String>,
+    legacy_key_opens_database: bool,
+    is_plaintext: bool,
+) -> Result<DatabaseRecovery, String> {
+    if current_key_opens_database {
+        return Ok(DatabaseRecovery::CurrentKey);
+    }
+    if let Some(key) = legacy_key.filter(|_| legacy_key_opens_database) {
+        return Ok(DatabaseRecovery::AdoptLegacyKey(key));
+    }
+    if is_plaintext {
+        return Ok(DatabaseRecovery::EncryptPlaintext);
+    }
+    Err("無法以作業系統金鑰儲存區中的金鑰開啟加密資料庫。資料庫可能屬於其他 OS 帳號，或金鑰已遺失。".to_owned())
+}
+
+fn apply_database_recovery<StoreLegacyKey, MigratePlaintext>(
+    recovery: DatabaseRecovery,
+    store_legacy_key: StoreLegacyKey,
+    migrate_plaintext: MigratePlaintext,
+) -> Result<(), String>
+where
+    StoreLegacyKey: FnOnce(&str) -> Result<(), String>,
+    MigratePlaintext: FnOnce() -> Result<(), String>,
+{
+    match recovery {
+        DatabaseRecovery::CurrentKey => Ok(()),
+        DatabaseRecovery::AdoptLegacyKey(key) => store_legacy_key(&key),
+        DatabaseRecovery::EncryptPlaintext => migrate_plaintext(),
+    }
+}
+
 #[cfg(test)]
 fn database_key(_path: &Path) -> Result<String, String> {
     Ok("4f1d9e31b9ca2a6f0c5d81a466f9ca75f1528e9ef8d3b8c17a2e945c13bfe68d".to_owned())
@@ -166,15 +235,20 @@ fn store_database_key(_path: &Path, _key: &str) -> Result<(), String> {
 
 #[cfg(not(test))]
 fn database_key(path: &Path) -> Result<String, String> {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    path.to_string_lossy().hash(&mut hasher);
-    let account = format!("dutygrid.db.v1.{:016x}", hasher.finish());
+    let database_id = database_key_id(path)?;
+    let account = format!("dutygrid.db.v2.{database_id}");
     let entry = Entry::new(DATABASE_KEYRING_SERVICE, &account)
         .map_err(|error| format!("無法使用作業系統金鑰儲存區：{error}"))?;
     match entry.get_password() {
         Ok(key) if valid_database_key(&key) => Ok(key),
         Ok(_) => Err("作業系統金鑰儲存區中的 DutyGrid 資料庫金鑰格式無效。".to_owned()),
         Err(KeyringError::NoEntry) => {
+            if let Some(previous_key) = path_based_database_key(path)? {
+                entry
+                    .set_password(&previous_key)
+                    .map_err(|error| format!("無法遷移資料庫金鑰參照：{error}"))?;
+                return Ok(previous_key);
+            }
             let mut bytes = [0u8; 32];
             rand::rng().fill_bytes(&mut bytes);
             let key = key_hex(&bytes);
@@ -184,6 +258,21 @@ fn database_key(path: &Path) -> Result<String, String> {
             Ok(key)
         }
         Err(error) => Err(format!("無法讀取作業系統金鑰儲存區中的資料庫金鑰：{error}")),
+    }
+}
+
+#[cfg(not(test))]
+fn path_based_database_key(path: &Path) -> Result<Option<String>, String> {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    path.to_string_lossy().hash(&mut hasher);
+    let account = format!("dutygrid.db.v1.{:016x}", hasher.finish());
+    let entry = Entry::new(DATABASE_KEYRING_SERVICE, &account)
+        .map_err(|error| format!("無法使用作業系統金鑰儲存區：{error}"))?;
+    match entry.get_password() {
+        Ok(key) if valid_database_key(&key) => Ok(Some(key)),
+        Ok(_) => Err("舊版路徑式資料庫金鑰格式無效。".to_owned()),
+        Err(KeyringError::NoEntry) => Ok(None),
+        Err(error) => Err(format!("無法讀取舊版路徑式資料庫金鑰：{error}")),
     }
 }
 
@@ -201,9 +290,7 @@ fn legacy_database_key() -> Result<Option<String>, String> {
 
 #[cfg(not(test))]
 fn store_database_key(path: &Path, key: &str) -> Result<(), String> {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    path.to_string_lossy().hash(&mut hasher);
-    let account = format!("dutygrid.db.v1.{:016x}", hasher.finish());
+    let account = format!("dutygrid.db.v2.{}", database_key_id(path)?);
     let entry = Entry::new(DATABASE_KEYRING_SERVICE, &account)
         .map_err(|error| format!("無法使用作業系統金鑰儲存區：{error}"))?;
     entry
@@ -438,20 +525,23 @@ pub fn initialize_state(app_data_dir: PathBuf) -> Result<AppState, String> {
     restrict_owner_permissions(&app_data_dir, true)?;
     let database_path = app_data_dir.join("dutygrid.db");
     let key = database_key(&database_path)?;
-    if database_path.exists() && !is_encrypted_database(&database_path, &key) {
-        if let Some(legacy_key) = legacy_database_key()? {
-            if is_encrypted_database(&database_path, &legacy_key) {
-                store_database_key(&database_path, &legacy_key)?;
-            } else if is_plaintext_database(&database_path)? {
-                migrate_plaintext_database(&database_path, &key)?;
-            } else {
-                return Err("無法以目前或舊版作業系統金鑰儲存區中的金鑰開啟加密資料庫。資料庫可能屬於其他 OS 帳號，或金鑰已遺失。".to_owned());
-            }
-        } else if is_plaintext_database(&database_path)? {
-            migrate_plaintext_database(&database_path, &key)?;
-        } else {
-            return Err("無法以作業系統金鑰儲存區中的金鑰開啟加密資料庫。資料庫可能屬於其他 OS 帳號，或金鑰已遺失。".to_owned());
-        }
+    if database_path.exists() {
+        let current_key_opens_database = is_encrypted_database(&database_path, &key);
+        let legacy_key = legacy_database_key()?;
+        let legacy_key_opens_database = legacy_key.as_ref().is_some_and(|legacy_key| {
+            !current_key_opens_database && is_encrypted_database(&database_path, legacy_key)
+        });
+        let recovery = choose_database_recovery(
+            current_key_opens_database,
+            legacy_key,
+            legacy_key_opens_database,
+            is_plaintext_database(&database_path)?,
+        )?;
+        apply_database_recovery(
+            recovery,
+            |legacy_key| store_database_key(&database_path, legacy_key),
+            || migrate_plaintext_database(&database_path, &key),
+        )?;
     }
     if database_path.exists()
         && recorded_migration_version(&database_path) < LATEST_MIGRATION_VERSION
@@ -1839,6 +1929,56 @@ pub fn delete_duty_plan(path: &Path, plan_id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chooses_current_key_when_it_opens_the_database() {
+        assert_eq!(
+            choose_database_recovery(true, Some("legacy-key".to_owned()), true, false)
+                .expect("current key should win"),
+            DatabaseRecovery::CurrentKey
+        );
+    }
+
+    #[test]
+    fn adopts_legacy_key_and_copies_it_to_the_current_key_entry() {
+        let recovery = choose_database_recovery(false, Some("legacy-key".to_owned()), true, false)
+            .expect("legacy key should be adopted");
+        let mut copied_key = None;
+        apply_database_recovery(
+            recovery,
+            |key| {
+                copied_key = Some(key.to_owned());
+                Ok(())
+            },
+            || panic!("legacy-key recovery must not migrate plaintext"),
+        )
+        .expect("legacy key should be copied");
+        assert_eq!(copied_key.as_deref(), Some("legacy-key"));
+    }
+
+    #[test]
+    fn migrates_plaintext_database_without_copying_a_legacy_key() {
+        let recovery = choose_database_recovery(false, None, false, true)
+            .expect("plaintext database should be migrated");
+        let mut migrated = false;
+        apply_database_recovery(
+            recovery,
+            |_| panic!("plaintext recovery must not copy a legacy key"),
+            || {
+                migrated = true;
+                Ok(())
+            },
+        )
+        .expect("plaintext database should be migrated");
+        assert!(migrated);
+    }
+
+    #[test]
+    fn rejects_encrypted_database_when_current_and_legacy_keys_fail() {
+        let error = choose_database_recovery(false, Some("legacy-key".to_owned()), false, false)
+            .expect_err("unrecoverable encrypted database must be rejected");
+        assert!(error.contains("金鑰已遺失"));
+    }
 
     fn create_plan(path: &Path, name: &str) -> DutyPlan {
         create_duty_plan(

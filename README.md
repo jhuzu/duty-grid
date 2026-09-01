@@ -2,6 +2,8 @@
 
 DutyGrid 是一套以地圖為核心、Desktop-first 的勤務部署規劃工具。
 
+完整的功能、架構、安全與驗收規格請參閱 [專案規格書](docs/project-specification.md)。
+
 目前專案基準資料：
 
 - `標準化部署表.xlsx`：部署表格式參考。
