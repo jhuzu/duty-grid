@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "勤務人力規劃系統",
+  "productName": "DutyGrid",
   "version": "0.1.0",
   "identifier": "tw.gov.newtaipei.dutygrid",
   "build": {
@@ -30,6 +30,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": [
+      "icons/icon.icns"
+    ],
     "macOS": {
       "signingIdentity": "-",
       "hardenedRuntime": false
